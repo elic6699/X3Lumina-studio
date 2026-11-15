@@ -23,6 +23,8 @@ Selected attribution highlights:
 - LibRaw (CDDL-1.0 OR LGPL-2.1-or-later)
 - darktable and RCD-Demosaicing derived algorithm implementations in source files
 - ACES core and ACES looks referenced for color pipeline formulas and transforms
+- x3f_tools 0.57 (BSD-3-Clause) and x3fuse (Apache-2.0), vendored in the X3F/X3I decode core
+  at alcedo_studio/src/decoders/x3f/ (added in this fork)
 
 Attribution/source pointers for adapted files:
 - alcedo/src/decoders/processor/operators/cpu/highlight_reconstruct.cpp
@@ -33,6 +35,14 @@ Attribution/source pointers for adapted files:
   CUDA adaptation of RCD demosaicing algorithm with upstream attribution.
 - alcedo/src/edit/runtime/drt/open_drt_runtime.cpp
   Contains GPLv3-derived logic adapted from OpenDRT v1.1.0.
+
+X3F/X3I decode core (added in this fork):
+- alcedo_studio/src/decoders/x3f/ carries the X3Lumina X3FCore decode tree,
+  contributed to this repository under GPL-3.0-only. It includes the container
+  parser, the Quattro own decoder, the Merrill native-chain path, the Foveon
+  decode-level adjustments and their calibration tables.
+- The proprietary style/film-look rendering chain is NOT part of this repository.
+- See THIRD_PARTY_NOTICE.txt section F for the vendored third-party licenses.
 
 If you redistribute this project, preserve this NOTICE file, THIRD_PARTY_NOTICE.txt,
 the LICENSE file, all relevant license texts in third_party_licenses/, and

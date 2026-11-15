@@ -1,0 +1,51 @@
+# AGENTS.md
+
+This file provides guidance to Agents like Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project: x3fuse-core
+
+`x3fuse-core` converts Sigma Foveon X3F raw files to DNG / TIFF / PPM / JPEG / metadata. It began as a ~10K-LOC C/C++ codebase and has been **fully ported to a Rust Cargo workspace**, with two tiny C log/version shims (in [crates/x3f-sys/csrc/](crates/x3f-sys/csrc/)). Denoise supports Non-Local Means and two-stage BM3D ([crates/x3f-sys/src/denoise.rs](crates/x3f-sys/src/denoise.rs)) with portable Rust CPU implementations and optional native wgpu/WGSL acceleration; OpenCV was removed. Native CLI builds enable GPU support by default, libraries opt in with `gpu`, and WASM stays CPU-only. Read [ARCHITECTURE.md](ARCHITECTURE.md) (pipeline + workspace) before non-trivial work; [docs/PORT-PLAN.md](docs/PORT-PLAN.md) is retained as a historical record of the port.
+
+### Build, test, lint
+
+```sh
+cargo build --release                                   # produces target/release/x3f_extract
+target/release/x3f_extract -dng input.X3F               # legacy single-dash flag syntax preserved
+
+cargo test --workspace                                  # all three test tiers
+cargo test --workspace --lib                            # tier 1 only (no corpus needed)
+cargo test --workspace -- --nocapture                   # show which tier-2/3 tests skipped
+
+cargo fmt --all --check                                 # CI gate
+cargo clippy --workspace --all-targets -- -D warnings   # CI gate
+
+# Explicit physical-GPU comparisons (ignored in ordinary CI):
+cargo test --release -p x3f-sys --features gpu denoise:: -- --include-ignored
+# Build and test the portable fallback independently:
+cargo test -p x3f-sys --no-default-features denoise::
+```
+
+### Workspace shape
+
+```
+x3f-cli  ──depends-on──▶  x3f-core  ──depends-on──▶  x3f-sys  ──FFI──▶  csrc/ (log/version shims)
+                                                              └── src/denoise.rs (pure-Rust NLM)
+```
+
+`x3f-sys` is the low-level layer where the `cc-rs` build of the tiny remaining C lives ([crates/x3f-sys/build.rs](crates/x3f-sys/build.rs), sources in [crates/x3f-sys/csrc/](crates/x3f-sys/csrc/)). `x3f-core` is the safe Rust API outside consumers depend on. `x3f-cli` is the binary.
+
+**Finding the right file.** The `x3f-sys` modules use milestone-prefixed doc comments (`M4d`, `M5b`, `M6e`…) that hide what they do — use the per-module map in [docs/src/workspace.md](docs/src/workspace.md) (each Rust module is mapped to the original C file it replaced) rather than grepping. The pipeline runs through `x3f-core`'s [`Reader`](crates/x3f-core/src/lib.rs): `Reader::open`/`from_bytes` → load sections → `dump_dng`/`dump_tiff`/`dump_ppm`/`dump_meta`/`dump_histogram` (1:1 with the legacy C entry points). Output writers are pure Rust under [crates/x3f-core/src/output/](crates/x3f-core/src/output/) (the DNG writer is the largest subsystem). See [docs/src/pipeline.md](docs/src/pipeline.md) for the stage-by-stage flow.
+
+### Conventions
+
+- **Highlight-recovery is the actively-iterated hot loop.** The chroma LUT, RepairPix, and matrix-pathology gate live in [crates/x3f-sys/src/highlight.rs](crates/x3f-sys/src/highlight.rs) and [process.rs](crates/x3f-sys/src/process.rs). Don't refactor while changing behavior; pair-review changes there.
+- **Byte-identical parity is the gate.** Tier-2 pins metadata/JPEG-thumbnail/PPM hashes automatically; DNG and TIFF have manual `-no-denoise` reference baselines on three corpus files (SD1M DNG `a2427c1db46066d7201f7499d46bb02d` TIFF `277cf4b4…`, older raw `_SDI8040` DNG `94c64ebc524077d4f51e96df868d9271` TIFF `b4cc09aa…`, Quattro `_SDI8284` DNG `7259dd2e0b4c5cde7e4e5c2531defa9f` TIFF `661df021…`) that must match unless a change is an _intentional_ algorithm change — when it is, re-pin the table in [docs/src/contributing.md](docs/src/contributing.md) in the same commit.
+- **Legacy CLI flag syntax is preserved.** Single-dash flags (`-dng`, `-tiff`, `-color sRGB`, `-no-denoise`, …) are kept verbatim so existing scripts and the test corpus continue to work. A modern subcommand interface is deferred.
+- **Denoise backends are per conversion.** Carry `DenoiseBackend` in options/`Control`, never a mutable global preference. `Auto` retries a failed GPU stage on CPU from its unchanged input; `Gpu` fails explicitly. GPU scratch is tiled, and cancellation must discard uncommitted results. Output with `-no-denoise` remains byte-identical; NLM GPU kernel comparisons allow at most one 16-bit code value; BM3D uses the documented FP32 agreement gate. Algorithm, channel selection, strength, and NLM windows live in `DenoiseOptions` and travel with `Control`. See [performance notes](docs/src/performance.md#gpu-denoising), including the change to default CPU luminance handling.
+- **`X3F_*` env vars are preserved.** Tunables like `X3F_NO_CHROMA_LUT`, `X3F_REPAIR_PIX`, `X3F_EV`, `X3F_GATE_THR`, `X3F_GATE_WIDTH`, `X3F_CHROMA_LUT_TRACE`, `X3F_DNG_SHOULDER_KNEE` keep working.
+- **C-ABI layouts stay stable.** The legacy C call graph (and the `x3f-ffi-c` public header) resolves through `#[no_mangle] extern "C"` Rust functions, so struct layouts must stay byte-compatible: `x3f_area16_t` is mirrored as `Area16` with `#[repr(C)]` and bindgen generates the rest of the layouts from the headers in `csrc/`. Heap allocations passed across the ABI use `libc::malloc`/`free`. (Denoise no longer crosses any boundary — it's pure Rust in `src/denoise.rs`.)
+- **Legacy C denoising stays CPU-only.** C entry points select `Cpu` explicitly even when a workspace build unifies the CLI's `gpu` feature into the libraries. Build `cargo build --release -p x3f-ffi-c` separately to exclude GPU dependencies. Rust 0.2 callers select their backend through options; preserve `Error::Gpu` through all controlled processing paths.
+
+### Test corpus
+
+Tier-2 (MD5) and tier-3 (perceptual) tests need an X3F corpus that is **not committed** (large + some files non-redistributable). They look for it at `$X3F_TEST_FILES` (env var) or `<workspace_root>/x3f_test_files/` (default). Tests skip silently with a one-line notice when corpus is missing — `cargo test --workspace` works on a clean checkout. See [crates/x3f-cli/tests/README.md](crates/x3f-cli/tests/README.md) for the three-tier design.

@@ -41,8 +41,12 @@ struct EmbeddedPreview {
  * Reading a preview opens the file with LibRaw, parses the metadata, and reads only the preview
  * bytes: it does not unpack the sensor data. For a 24 MP file this reads a few MB instead of the
  * whole file, and a JPEG preview decodes at 1/2, 1/4, or 1/8 scale without a full-size decode.
+ * Sigma X3F/X3I files take a separate path: their full-size camera JPEG is read directly from
+ * the X3F directory (default 0 EV frame for an X3I container), because LibRaw treats Foveon as
+ * an unsupported CFA layout. That path also never reads the whole container.
  *
- * Thread: every call uses its own LibRaw processor; calls on different threads run in parallel.
+ * Thread: every call uses its own LibRaw processor or its own X3F buffer; calls on different
+ * threads run in parallel.
  */
 class EmbeddedPreviewReader {
  public:

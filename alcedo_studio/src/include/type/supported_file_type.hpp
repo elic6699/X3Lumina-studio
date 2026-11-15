@@ -97,10 +97,10 @@ using ImportPathSet = std::unordered_set<std::filesystem::path::string_type>;
 }
 
 /// RAW extensions, also listed in docs/supported_raw_formats.md.
-inline constexpr std::array<std::string_view, 26> kRawExtensions = {
+inline constexpr std::array<std::string_view, 27> kRawExtensions = {
     ".3fr", ".arw", ".cr2", ".cr3", ".crw", ".dcr", ".dng", ".erf", ".fff",
     ".iiq", ".kdc", ".mef", ".mos", ".mrw", ".nef", ".nrw", ".orf", ".pef",
-    ".raf", ".raw", ".rw2", ".rwl", ".sr2", ".srf", ".srw", ".x3f"};
+    ".raf", ".raw", ".rw2", ".rwl", ".sr2", ".srf", ".srw", ".x3f", ".x3i"};
 
 /// One raster extension of an import category.
 struct RasterImportExtension {

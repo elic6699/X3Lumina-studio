@@ -45,8 +45,13 @@ class RawInputLoader {
 
   /**
    * @brief Direct RGB (already demosaiced) host plane. No LibRaw.
+   *
+   * @p decode_res applies the same 2x2 box LOD as the CFA path (no clamp), so
+   * preview/thumbnail requests do not upload a full-resolution F32 plane.
+   * Defaults to FULL for existing callers.
    */
-  [[nodiscard]] static auto FromDirectRgb(HostImagePlane plane, RawSensorGeometry sensor)
+  [[nodiscard]] static auto FromDirectRgb(HostImagePlane plane, RawSensorGeometry sensor,
+                                         DecodeRes decode_res = DecodeRes::FULL)
       -> PreparedRawInput;
 
   [[nodiscard]] static auto TryLoadEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)

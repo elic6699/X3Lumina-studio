@@ -157,6 +157,7 @@ def_library(ImageDecoder
 def_library(ImageLoader 
     SOURCES ${ALCEDO_SRC_ROOT}/io/image/image_loader.cpp
     PUBLIC_DEPS ImageDecoder
+    PRIVATE_DEPS alcedo_x3f_support
 )
 
 # ==============================================================================

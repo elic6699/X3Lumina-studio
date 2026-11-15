@@ -1,0 +1,30 @@
+bin/
+deps/lib/
+deps/src/
+dist/
+target/
+Cargo.lock
+*~
+a.out
+.vagrant
+.DS_Store
+venv/
+x3f_test_files/
+build/
+_local/
+test_output/
+temp/
+docs/book/
+.claude/
+llm/
+_local/
+
+# AlcedoStudio's root .gitignore has generic `csrc/` and `*build-*` rules that
+# also match this vendored snapshot. Everything below is source required by
+# crates/x3f-sys/build.rs (bindgen headers + the two compiled C shims), the
+# pinned dependency lock, and the xcframework build helper -- keep them tracked
+# so a fresh clone can build the vendored crates without regeneration.
+!Cargo.lock
+!crates/x3f-sys/csrc/
+!crates/x3f-sys/csrc/**
+!crates/x3f-ffi-c/scripts/build-xcframework.sh

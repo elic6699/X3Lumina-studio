@@ -38,6 +38,7 @@ def_library(EmbeddedPreviewReader
         "${ALCEDO_SRC_ROOT}/io/image/embedded_preview_reader.cpp"
     PUBLIC_DEPS opencv_core
     PRIVATE_DEPS libraw::raw_r libjpeg-turbo::turbojpeg opencv_imgproc
+                 alcedo_x3f_support
 )
 
 def_library(ExifIfdTags

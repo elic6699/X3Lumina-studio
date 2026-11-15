@@ -108,7 +108,8 @@ def_library(Image
 # The bundled gRPC builds a static zlib with the same symbols. When it exists, Image uses it,
 # so that a target that links both gRPC and Image has one zlib.
 target_link_libraries(Image PRIVATE OpenImageIO::OpenImageIO lcms2::lcms2
-    $<IF:$<TARGET_EXISTS:zlibstatic>,zlibstatic,ZLIB::ZLIB> Sha256Digest)
+    $<IF:$<TARGET_EXISTS:zlibstatic>,zlibstatic,ZLIB::ZLIB> Sha256Digest
+    alcedo_x3f_support)
 
 # Image Pool
 def_library(ImagePool

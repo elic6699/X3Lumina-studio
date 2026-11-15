@@ -12,6 +12,7 @@
 #include <string>
 #include <utility>
 
+#include "decoders/x3f/x3f_support.hpp"
 #include "image/lens_identity_resolver.hpp"
 #include "metadata/dng_color_metadata.hpp"
 #include "metadata/dng_import_fast_path.hpp"
@@ -153,6 +154,65 @@ void MetadataExtractor::ExtractEXIF_ToImage(const image_path_t& image_path, Imag
     ExtractRasterMetadata_ToImage(image_path, *raster_kind, image);
     return;
   }
+  // Sigma Foveon: the camera-rendered full-size JPEG carries the EXIF. LibRaw rejects the
+  // Foveon CFA layout and does not know the X3I (SFD) container at all. Read only that
+  // JPEG instead of the whole container, which can be gigabytes large for seven frames.
+  if (x3f::IsX3fFile(image_path) && x3f::Probe(image_path)) {
+    if (!CategoryAllowed(allowed_categories, ImportFileCategory::Raw)) {
+      exclude(ImportFileCategory::Raw);
+    }
+
+    // Bulk import must stay decode-free: the camera matrix comes from the
+    // header + CAMF metadata only, never from decompressed sensor planes.
+    // Develop resolves camera_to_AP1 exclusively from the document camera
+    // profile bound here; the decode-side PreparedRawInput context does NOT
+    // feed the render path, so a missing matrix would throw later.
+    const auto profile = x3f::ColorProfile(image_path);
+    if (!profile) {
+      // No Rec.709 fallback: that would reinterpret camera-native primaries as
+      // sRGB and narrow the gamut. Fail loudly instead.
+      throw MetadataExtractionError(ImportErrorCode::UNSUPPORTED_FORMAT, image_path,
+                                    "X3F/X3I has no usable camera colour matrix");
+    }
+
+    // Most bodies carry a full-size embedded JPEG with the EXIF. The oldest
+    // bodies (SD9/SD10) have no embedded JPEG at all; their capture metadata
+    // lives in SECp. Import must still succeed so the RAW can be decoded.
+    const auto jpeg = x3f::ReadEmbeddedJpeg(image_path);
+    if (!jpeg.empty()) {
+      if (auto exif_data = ExtractEXIFFromBuffer(jpeg.data(), jpeg.size())) {
+        auto display     = EXIFToDisplayMetaData(exif_data);
+        image.has_exif_  = !exif_data->exifData().empty();
+        image.exif_data_ = std::move(exif_data);
+        image.SetExifDisplayMetaData(std::move(display));
+      }
+    }
+
+    RawRuntimeColorContext ctx;
+    ctx.valid_                         = true;
+    ctx.output_in_camera_space_        = true;
+    ctx.camera_make_                   = "SIGMA";
+    ctx.cam_mul_[0] = ctx.cam_mul_[1] = ctx.cam_mul_[2] = 1.0f;
+    ctx.pre_mul_[0] = ctx.pre_mul_[1] = ctx.pre_mul_[2] = 1.0f;
+    // DNG ColorMatrix convention is XYZ->camera; cam_to_xyz is its exact
+    // inverse. Develop applies its single Bradford D65->D50 adaptation.
+    for (int i = 0; i < 9; ++i) {
+      ctx.color_matrix_1_[i] = profile->xyz_to_cam[i];
+      ctx.color_matrix_2_[i] = profile->xyz_to_cam[i];
+    }
+    ctx.color_matrices_valid_          = true;
+    ctx.calibration_illuminants_valid_ = false;
+    ctx.color_matrix_1_cct_            = 6504.0;
+    ctx.color_matrix_2_cct_            = 6504.0;
+    ctx.forward_matrices_valid_        = false;
+    ctx.as_shot_neutral_valid_         = true;
+    ctx.as_shot_neutral_[0] = ctx.as_shot_neutral_[1] = ctx.as_shot_neutral_[2] = 1.0;
+    // dng_profile_ intentionally stays an empty (unbound) reference.
+    image.SetRawColorContext(std::move(ctx));
+    return;
+  }
+  // Not a Foveon container despite the extension: fall through to LibRaw.
+
   // ExtractRawMetadata_ToImage reads RAW files with LibRaw. Exiv2 adds metadata to DNG files only.
   if (ExtractRawMetadata_ToImage(image_path, image)) {
     if (!CategoryAllowed(allowed_categories, ImportFileCategory::Raw)) {

@@ -1,0 +1,38 @@
+[package]
+name = "x3f-ffi-c"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+# `x3f` is the linker name: produces `libx3f.dylib` / `libx3f.so` / `x3f.dll`
+# (cdylib) and `libx3f.a` / `x3f.lib` (staticlib). The staticlib feeds the
+# iOS xcframework / Android jniLibs builds in M8b/M8c; the cdylib is the
+# preferred option for desktop dynamic-linking consumers.
+name = "x3f"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+# 本地新增：把 GPU 降噪（wgpu 27）编进静态库。宿主（X3F 抽取器）要 GPU
+# 就得开它；不开就是纯 CPU（0.1.6 的行为）。
+# 注意静态库不会替宿主带上链接参数，-framework Metal 等要宿主自己加
+# （见 build_x3fuse.sh 与 Package.swift）。
+gpu = ["x3f-core/gpu"]
+
+[dependencies]
+x3f-core.workspace = true
+x3f-sys.workspace = true
+libc = "0.2"
+
+[build-dependencies]
+# Pinned at 0.27 (Oct 2024). Update with care: cbindgen sometimes regresses
+# on `#[repr(C)] struct Foo { _private: [u8; 0] }` opaque-handle output.
+cbindgen = "0.27"
+
+# x3f-sys (transitive through x3f-core) opts out of clippy::all to keep
+# bindgen-generated code from drowning the workspace, so any new lints
+# we want to enforce on this crate must go here. We just inherit the
+# workspace defaults.
+[lints]
+workspace = true

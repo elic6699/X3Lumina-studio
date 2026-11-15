@@ -21,8 +21,10 @@
 #include <utility>
 #include <vector>
 
+#include "decoders/x3f/x3f_support.hpp"
 #include "edit/input/detail/prepared_input_finish.hpp"
 #include "edit/input/raw_input_loader.hpp"
+#include "edit/input/x3f_input_loader.hpp"
 #include "image/image_content_class.hpp"
 #include "image/raster_color_description.hpp"
 #include "image/raster_container_reader.hpp"
@@ -423,6 +425,13 @@ auto RasterInputLoader::FromHostPlane(HostImagePlane plane, int orientation_flip
 
 auto LoadEncodedImage(std::span<const std::byte> encoded, DecodeRes decode_res)
     -> PreparedRawInput {
+  // Sigma Foveon: LibRaw rejects is_foveon in ThrowIfUnsupported and does not
+  // understand the X3I container. Sniff the magic before content classification
+  // so every decode entry point (thumbnail, semantic input, renderer unpack and
+  // PreparedSourceCache) reaches the same scene-linear DirectRgb bridge.
+  if (x3f::IsX3fEncoded(encoded)) {
+    return x3f::LoadX3fEncoded(encoded, decode_res);
+  }
   if (const auto kind = RasterFileKindFor(ClassifyImageContent(encoded))) {
     return RasterInputLoader::LoadEncoded(encoded, decode_res, *kind);
   }

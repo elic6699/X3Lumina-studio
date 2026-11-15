@@ -14,6 +14,9 @@
 #include <opencv2/imgproc.hpp>
 #include <stdexcept>
 #include <string>
+#include <utility>
+
+#include "decoders/x3f/x3f_support.hpp"
 
 namespace alcedo {
 namespace {
@@ -171,10 +174,60 @@ auto ColourPreviewIndex(LibRaw& processor) -> int {
   return best;
 }
 
+/// Sigma Foveon files store a camera-rendered full-size JPEG. Read those bytes
+/// directly: LibRaw classifies Foveon as an unsupported CFA layout, so its
+/// thumbnail path cannot be used. An X3I container resolves to the default
+/// (0 EV) frame; frame selection is an edit parameter handled downstream.
+auto ReadX3fPreview(const std::filesystem::path& raw_path, uint32_t min_short_edge,
+                    EmbeddedPreview* preview) -> bool {
+  const auto jpeg = x3f::ReadEmbeddedJpeg(raw_path);
+  if (jpeg.empty()) {
+    return false;
+  }
+  if (!DecodeJpegPreview(jpeg.data(), jpeg.size(), min_short_edge, raw_path, preview)) {
+    return false;
+  }
+
+  // The JPEG pixels are stored in sensor orientation. Newer bodies tag the
+  // rotation in EXIF; older Foveon bodies (SD9/SD10/SD14/SD15, X3F v2.x) only
+  // write it to the X3F header Rotation field and leave EXIF at 1. Resolve
+  // once here so library previews of portrait shots are not lying on their side.
+  const int exif        = x3f::EmbeddedJpegOrientation(jpeg);
+  const int orientation = x3f::ResolveOrientation(raw_path, exif);
+  int       flip        = 0;
+  bool      mirror      = false;
+  switch (orientation) {
+    case 2: mirror = true; break;
+    case 3: flip = 3; break;
+    case 4: mirror = true; flip = 3; break;
+    case 5: mirror = true; flip = 5; break;
+    case 6: flip = 6; break;
+    case 7: mirror = true; flip = 6; break;
+    case 8: flip = 5; break;
+    default: break;
+  }
+  if (mirror) {
+    cv::Mat mirrored;
+    cv::flip(preview->rgb8, mirrored, 1);
+    preview->rgb8 = std::move(mirrored);
+  }
+  preview->rgb8            = Orient(std::move(preview->rgb8), flip);
+  preview->orientation_flip = flip;
+  return true;
+}
+
 }  // namespace
 
 auto EmbeddedPreviewReader::Read(const std::filesystem::path& raw_path, uint32_t min_short_edge)
     -> std::optional<EmbeddedPreview> {
+  if (x3f::IsX3fFile(raw_path)) {
+    EmbeddedPreview preview;
+    if (!ReadX3fPreview(raw_path, min_short_edge, &preview)) {
+      return std::nullopt;
+    }
+    return preview;
+  }
+
   // Heap allocation: a LibRaw processor holds several hundred KB of tables.
   auto processor = std::make_unique<LibRaw>();
   int  rc        = OpenRaw(*processor, raw_path);

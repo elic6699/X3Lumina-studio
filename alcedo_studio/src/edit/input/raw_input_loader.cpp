@@ -625,8 +625,8 @@ auto RawInputLoader::FromUnpackedCfa(HostImagePlane plane, RawCfaPattern pattern
   return FinishPrepared(std::move(input), decode_res, encoded_hash, encoded_bytes);
 }
 
-auto RawInputLoader::FromDirectRgb(HostImagePlane plane, RawSensorGeometry sensor)
-    -> PreparedRawInput {
+auto RawInputLoader::FromDirectRgb(HostImagePlane plane, RawSensorGeometry sensor,
+                                   DecodeRes decode_res) -> PreparedRawInput {
   if (plane.format != HostPixelFormat::F32Rgba || plane.extent.Empty() || !plane.bytes) {
     throw std::runtime_error("RawInputLoader::FromDirectRgb: F32 RGBA plane required");
   }
@@ -646,7 +646,7 @@ auto RawInputLoader::FromDirectRgb(HostImagePlane plane, RawSensorGeometry senso
   input.color_context.output_in_camera_space_ = true;
   const auto encoded_hash                     = HashContentBytes(input.pixels.Span());
   const auto encoded_bytes                    = input.pixels.ByteCount();
-  return FinishPrepared(std::move(input), DecodeRes::FULL, encoded_hash, encoded_bytes);
+  return FinishPrepared(std::move(input), decode_res, encoded_hash, encoded_bytes);
 }
 
 auto RawInputLoader::LoadEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)

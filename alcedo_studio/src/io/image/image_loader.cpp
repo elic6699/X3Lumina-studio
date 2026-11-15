@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "decoders/decoder_scheduler.hpp"
+#include "decoders/x3f/x3f_support.hpp"
 #include "type/type.hpp"
 
 namespace alcedo {
@@ -101,7 +102,11 @@ auto ByteBufferLoader::LoadFromImage(std::shared_ptr<Image> img)
   }
 
   try {
-    return std::make_shared<std::vector<uint8_t>>(ReadWholeFile(img->image_path_));
+    // X3I (SFD) containers hold seven full frames. Route through
+    // LoadByteBufferFromPath so the editor input buffer only materializes
+    // the selected frame instead of mapping a gigabyte-scale container.
+    return std::make_shared<std::vector<uint8_t>>(
+        LoadByteBufferFromPath(img->image_path_));
   } catch (...) {
     return nullptr;
   }
@@ -115,6 +120,16 @@ auto ByteBufferLoader::LoadByteBufferFromImage(std::shared_ptr<Image> img) -> st
 }
 
 auto ByteBufferLoader::LoadByteBufferFromPath(const image_path_t& path) -> std::vector<uint8_t> {
+  // An X3I (SFD) container holds seven full X3F frames and can be gigabytes large.
+  // Materialize just the selected frame as a standalone X3F so a preview or
+  // semantic-input request never maps the whole container into memory.
+  // A plain X3F has no container layer and keeps the normal whole-file path.
+  if (x3f::IsX3fFile(path)) {
+    auto frame = x3f::MaterializeFrame(path);
+    if (!frame.empty()) {
+      return frame;
+    }
+  }
   return ReadWholeFile(path);
 }
 

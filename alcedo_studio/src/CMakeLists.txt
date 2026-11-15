@@ -38,6 +38,11 @@ add_subdirectory(cuda)
 
 add_subdirectory(metal)
 
+# X3F / X3I decode core is a leaf dependency of image (import metadata),
+# decoders (RAW bridge), io (embedded preview) and app (export), so it has to
+# be declared before the first domain that consumes it.
+add_subdirectory(decoders/x3f)
+
 # ==============================================================================
 add_subdirectory(image)
 add_subdirectory(decoders)

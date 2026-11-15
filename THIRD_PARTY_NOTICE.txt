@@ -241,7 +241,34 @@ License: MIT
 License text file: third_party_licenses/c-ares-LICENSE.md
 The corresponding source archive is in the aria2 release above.
 
-E) Redistribution reminder
+E) X3F / X3I (Sigma Foveon) decode core - added in this fork
+
+Location: alcedo_studio/src/decoders/x3f/
+The decode core (X3F/X3I container parsing, the Quattro own decoder, the Merrill
+native-chain path, Foveon decode-level adjustments and their calibration tables)
+is contributed to this repository under GPL-3.0-only, the same license as the
+project. The style/film-look rendering chain is not included.
+
+E1) x3f_tools 0.57 (core/CX3FLegacy)
+Authors: Roland Karlsson, Erik Karlsson, Mark Roden (anisotropic filtering parts)
+License: BSD-3-Clause
+License text files:
+- third_party_licenses/x3f_tools-BSD-3-Clause.txt
+- alcedo_studio/src/decoders/x3f/core/CX3FLegacy/COPYRIGHT_x3f_tools.txt (retained in-tree)
+Usage note: the legacy decoder is compiled with all global symbols renamed to
+legacy_* via x3f_legacy_prefix.h so it can coexist with the Rust C ABI.
+
+E2) x3fuse 0.3.0 (vendor/x3fuse)
+Upstream: https://github.com/sagwaco/x3fuse-core
+License: Apache-2.0
+License text files:
+- third_party_licenses/x3fuse-Apache-2.0.txt
+- alcedo_studio/src/decoders/x3f/vendor/x3fuse/LICENSE (retained in-tree)
+- alcedo_studio/src/decoders/x3f/vendor/x3fuse/NOTICE (retained in-tree)
+Usage note: built as a Rust static library (libx3f.a) with LTO disabled; it
+exports the x3f_tools C ABI used by the C render layer.
+
+F) Redistribution reminder
 
 - Keep this notice, the root LICENSE, the root NOTICE, and all files in third_party_licenses/ when redistributing source/binaries.
 - Preserve original copyright and license headers in source files.

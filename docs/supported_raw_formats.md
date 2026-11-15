@@ -38,7 +38,20 @@ selected type. The table is the same as `ImportFileCategory` in
 | `.sr2` | Sony RAW 2 |
 | `.srf` | Sony RAW |
 | `.srw` | Samsung RAW |
-| `.x3f` | Sigma RAW |
+| `.x3f` | Sigma Foveon RAW |
+| `.x3i` | Sigma Foveon SFD container (7 frames) |
+
+### Sigma Foveon (`.x3f` / `.x3i`)
+
+Foveon files do not use a CFA mosaic, so they bypass LibRaw's demosaic path. Alcedo Studio reads
+them with the bundled X3F/X3I decode core (`alcedo_studio/src/decoders/x3f`):
+
+- Import reads only the header, the trailing directory and the camera-rendered full-size embedded
+  JPEG for metadata and previews. A `.X3I` SFD container is never mapped into memory as a whole;
+  only the selected frame is materialized as a standalone X3F.
+- One `.X3I` file is one photo in the library. The default frame is 0 EV; the −3…+3 EV frames are
+  selectable as an edit parameter.
+- Previews and import metadata come from the selected frame's embedded JPEG.
 
 ### Raster images
 
