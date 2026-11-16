@@ -113,13 +113,13 @@ auto BuildSpecs() -> std::vector<FoveonParameterSpec> {
                     {"", "Sunlight", "Shade", "Overcast", "Incandescent",
                      "Fluorescent", "Flash", "Auto", "Custom"}));
 
-  s.push_back(Scalar<&FoveonEditParams::fill_light>("fill_light", "填充光", "fill", -2, 2, 0.1, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_hlzred>("fl_hlzred", "高光压缩", "advanced", 0, 2, 0.01, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_lmean_r>("fl_lmean_r", "局部均值半径", "advanced", -2, 2, 0.01, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_msat>("fl_msat", "饱和度映射", "advanced", -2, 2, 0.01, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_mapgain>("fl_mapgain", "映射增益", "advanced", 0, 2, 0.01, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_k0off>("fl_k0off", "k0 偏移", "advanced", -2, 2, 0.01, 2));
-  s.push_back(Scalar<&FoveonEditParams::fl_zgain>("fl_zgain", "z 增益", "advanced", 0, 2, 0.01, 2));
+  // Fill light has no control here any more. It is a Tone operator now
+  // (EditorTonePanel, under Blacks) and the decode copy is forced to zero in
+  // x3f_input_loader, so the six calibration knobs that only shaped the decode
+  // gain map (highlight roll-off, local-mean radius, saturation mapping, map
+  // gain, k0 offset, z gain) had nothing left to calibrate. The struct fields
+  // stay so existing .x3fedit.json sidecars still load, and the C chain still
+  // skips the whole gain map when fill_light == 0.
 
   // Five SPP denoise positions in X3Lumina (0, .25, .5, .75, 1). In SPP mode
   // the C bridge maps them onto rows 2/3/3/4/4.

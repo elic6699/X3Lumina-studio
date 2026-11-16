@@ -98,12 +98,10 @@ Item {
         }
         if (group === "spp")
             return []
-        // Fill light moved to the Tone panel (under Blacks) so every document can
-        // use it; the decode copy is forced to zero, so keeping the slider here
-        // would be a second, inert control.
-        return root.specs.filter(function (s) {
-            return s.group === group && s.key !== "fill_light"
-        })
+        // Fill light and its calibration knobs are gone from the decode table:
+        // fill light is a Tone operator (under Blacks, every document) and the
+        // decode copy is pinned to zero, so nothing here can shape it.
+        return root.specs.filter(function (s) { return s.group === group })
     }
 
     Component.onCompleted: root.refreshSpecs()
