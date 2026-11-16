@@ -14446,7 +14446,7 @@ static void sdq_linear_desat(float *out, const float *clip, int w, int h,
             float *px = d + (size_t)x * 3;
             double r = px[0], g = px[1], b = px[2];
             double yl = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            double e0, e1, e2, dmn, dmx, ye, wd, ww, wc, cs, t, nlin;
+            double e0, e1, e2, dmn, dmx, ye, wd, ww, wc, cs, t, mx_lin;
             int k;
 
             /* ① RAW 饱和分那一路（原版的主路）：两个通道顶到传感器上限就
@@ -14478,18 +14478,31 @@ static void sdq_linear_desat(float *out, const float *clip, int w, int h,
             ww = (wc > wd) ? wc : wd;
             if (ww <= 0.001) continue;
 
-            /* 目标：先取显示亮度（= 去饱和到同亮度的中性），"确定是白"的点
-             * 改成最亮通道 —— 否则 B 会停在掉下来的那一档，看着还是淡黄。 */
-            t = ye;
-            if (wd > 0.5) {
-                if (dmx > t) t = dmx;
-            } else if (cs >= 0.0) {
-                double u = sstep01(1.6, 2.4, cs);
-                if (u > 0.0) t += (dmx - t) * u;
+            mx_lin = r > g ? r : g;
+            if (b > mx_lin) mx_lin = b;
+
+            /* 目标用**本像素自己的线性值**算，绝不先夹到白点再换回来：
+             * 火花这类过曝点的线性值可以到 5 以上，夹到 1.4 当目标就会把它们
+             * 从 5 压到 1.4，同一块反光里邻居没被夹 —— 白斑里就长出一片黑点
+             * （2026-11-16 用户报障）。
+             *
+             * 两条权重来源给不同目标：
+             *   · RAW 饱和分驱动（一个通道已顶到传感器上限）→ 目标就是**这个
+             *     像素最亮的通道**。饱和像素的颜色本身不可信（那正是滑杆要修
+             *     的东西），而它的"亮"必须保住：拿线性亮度当目标时，洋红火花
+             *     (0.78, 0.39, 1.09) 的亮度只有 0.52 —— 白点阵里就落下一颗
+             *     灰点。往最亮通道拉只会把其余通道抬上去，绝不压暗。
+             *   · 显示域窗口驱动（没饱和的淡黄）→ 照原版取显示亮度，判「确定
+             *     是白」(wd > 0.5) 时同样改用最亮通道。 */
+            if (wc > wd) {
+                t = mx_lin;
+            } else {
+                t = yl;
+                if (t < 0.0) t = 0.0;
+                if (wd > 0.5 && mx_lin > t) t = mx_lin;
             }
 
-            nlin = srgb_decode(t) * kWhite;
-            for (k = 0; k < 3; k++) px[k] = (float)(px[k] + (nlin - px[k]) * ww);
+            for (k = 0; k < 3; k++) px[k] = (float)(px[k] + (t - px[k]) * ww);
         }
     }
 }
