@@ -469,8 +469,13 @@ void ExecuteMetalDevelop(MetalRenderDevice& device, const ExecutionPlan& plan,
       workspace.Device().UploadTexture2D(uploaded, input.pixels.Span(), device.CommandContext());
     }
     auto* command_buffer = CommandBuffer(device);
-    metal::EncodeLinearizeRgb(command_buffer, Native(uploaded),
-                              input.rgb_linearization.value_or(RawRgbLinearizationParams{}));
+    // DirectRgb (X3F/Foveon bridge) already carries scene-linear values and
+    // leaves rgb_linearization empty on purpose. Linearizing it with a
+    // default-constructed parameter set multiplies every pixel by zero, so the
+    // pass runs only for unpacked RGB that still needs level/WB conversion.
+    if (input.rgb_linearization.has_value()) {
+      metal::EncodeLinearizeRgb(command_buffer, Native(uploaded), *input.rgb_linearization);
+    }
     auto* source = Native(uploaded);
     if (hlr && input.rgb_linearization.has_value()) {
       auto& corrected = AcquireScratch(workspace, width, height, TextureFormat::Rgba32f);

@@ -15878,6 +15878,42 @@ int x3f_render_probe_is_quattro_gen(const char *path)
     return is_quattro;
 }
 
+/* 探测是否 SD Quattro / SD Quattro H 机身（RAW type_format 0x25 / 0x27）。
+ *
+ * 「SDQ 高光」面板门控用这个，而不是 x3f_render_probe_sdq_hl：
+ *   · 归一强度在 C 链里只对 DigitalISOGain≠1 的机身有像素效果
+ *     （SDQH 是 4,4,2；SDQ 是 1,1,1，乘 1.0 精确无变化）；
+ *   · 但 X3Lumina 在两种 SDQ 机身上都摆滑杆，按增益门控会把 SDQ 的滑杆
+ *     误置灰（2026-11-16 用户实测报障「SDQ 高光拉杆无法拖动」）。
+ * 门控按机身、效果按增益，两块口径分开。 */
+int x3f_render_probe_is_sdq_body(const char *path)
+{
+    FILE *f;
+    x3f_t *x3f;
+    x3f_directory_entry_t *DE;
+    int is_sdq = 0;
+    char tmp[1024];
+    const char *use;
+
+    if (path == NULL) return 0;
+    if (is_x3i_container(path)) return 0;
+    use = x3f_standalone_path(path, -1, tmp, sizeof(tmp));
+    if (use == NULL) { x3f_temp_release(tmp); return 0; }
+    f = fopen(use, "rb");
+    if (f == NULL) { x3f_temp_release(tmp); return 0; }
+    x3f = x3f_new_from_file(f);
+    if (x3f == NULL) { fclose(f); x3f_temp_release(tmp); return 0; }
+    DE = x3f_get_raw(x3f);
+    if (DE != NULL) {
+        uint32_t tf = DE->header.data_subsection.image_data.type_format;
+        is_sdq = (tf == X3F_IMAGE_RAW_SDQ || tf == X3F_IMAGE_RAW_SDQH);
+    }
+    x3f_delete(x3f);
+    fclose(f);
+    x3f_temp_release(tmp);
+    return is_sdq;
+}
+
 /* 探测这张文件是否属于 Classic-Foveon auto-tone 代（SD14 / SD1 等）。
  * 与 load_common 里设置 g_classic_active 的判据**逐位一致**：
  *   · CAMMODEL == "SIGMA SD1"（无 DBG_Auto* 块，走 SD1 专属曲线）
@@ -15963,7 +15999,9 @@ static int merrill_spp_switch = -1;
 
 void x3f_render_spp_set_enabled(int on)
 {
-    merrill_spp_switch = on ? 1 : 0;
+    /* -1 means "follow X3F_MERRILL_SPP"; it must not collapse to 0. The
+     * callers use set_enabled(1) ... set_enabled(-1) around a probe/render. */
+    merrill_spp_switch = (on < 0) ? -1 : (on ? 1 : 0);
 }
 
 static int merrill_spp_enabled(void)

@@ -839,6 +839,11 @@ int x3f_render_probe_is_quattro(const char *path);
  * 上标定过，SDQ 保持窄口径），宿主 OE 门控与面板置灰走这个。 */
 int x3f_render_probe_is_quattro_gen(const char *path);
 
+/* SD Quattro / SD Quattro H 机身探针（RAW type_format 0x25 / 0x27）。
+ * 「SDQ 高光」面板门控用：两种 SDQ 机身都要摆滑杆，而 C 链的归一强度只对
+ * DigitalISOGain≠1 的机身有像素效果，所以门控不能按增益判断。 */
+int x3f_render_probe_is_sdq_body(const char *path);
+
 /* 这张文件是否属于 Classic-Foveon auto-tone 代（SD14 / SD1 等）。
  * 判据与 load_common 设置 g_classic_active 一致（CAMMODEL=="SIGMA SD1" 或
  * CAMF 含 DBG_AutoContrast）。供 Swift 侧预览降噪门槛绕过用。只看文件头/CAMF，

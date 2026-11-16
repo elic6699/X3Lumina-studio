@@ -338,6 +338,37 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
   editor_session_ =
       std::make_unique<EditorSessionController>(editor_session_runtime_->service.get(), this);
   RecordConstruction("EditorSessionController", editor_session_.get());
+
+  // Path B: the Foveon native chain is an explicitly selected CPU sidecar. It
+  // resolves the current source file from the image pool but never writes to
+  // the editor session's Develop document or render cache.
+  auto foveon_path = [this](std::uint32_t image_id) -> std::filesystem::path {
+    if (!project_ || !project_->handler().project()) {
+      return {};
+    }
+    auto pool = project_->handler().project()->GetImagePoolService();
+    if (!pool) {
+      return {};
+    }
+    try {
+      return pool->Read<std::filesystem::path>(
+          image_id, [](std::shared_ptr<alcedo::Image> img) -> std::filesystem::path {
+            return img ? img->image_path_ : std::filesystem::path{};
+          });
+    } catch (const std::exception&) {
+      return {};
+    }
+  };
+  foveon_session_ =
+      std::make_unique<FoveonSessionController>(std::move(foveon_path), this);
+  RecordConstruction("FoveonSessionController", foveon_session_.get());
+  connect(editor_session_.get(), &EditorSessionController::StateChanged,
+          foveon_session_.get(), [this]() {
+            if (editor_session_ && foveon_session_) {
+              foveon_session_->SyncFromImageId(editor_session_->image_id());
+            }
+          });
+
   editor_comparison_ = std::make_unique<EditorComparisonController>(
       editor_session_.get(), SharedComparisonImageStore(), this);
   RecordConstruction("EditorComparisonController", editor_comparison_.get());
@@ -832,6 +863,9 @@ void ApplicationModuleHost::AttachQmlEngine(QQmlEngine* engine) {
                            new ComparisonImageProvider(SharedComparisonImageStore()));
   engine->addImageProvider(QString::fromUtf8(kLutPreviewImageProviderId),
                            new LutPreviewImageProvider(SharedLutPreviewImageStore()));
+  // Independent path-B preview overlay. QQmlEngine owns the provider.
+  engine->addImageProvider(QStringLiteral("foveon_preview"),
+                           new FoveonPreviewImageProvider(SharedFoveonPreviewStore()));
 
   if (library_ == nullptr) {
     return;

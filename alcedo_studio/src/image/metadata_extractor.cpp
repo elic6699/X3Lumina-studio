@@ -194,8 +194,10 @@ void MetadataExtractor::ExtractEXIF_ToImage(const image_path_t& image_path, Imag
     ctx.camera_make_                   = "SIGMA";
     ctx.cam_mul_[0] = ctx.cam_mul_[1] = ctx.cam_mul_[2] = 1.0f;
     ctx.pre_mul_[0] = ctx.pre_mul_[1] = ctx.pre_mul_[2] = 1.0f;
-    // DNG ColorMatrix convention is XYZ->camera; cam_to_xyz is its exact
-    // inverse. Develop applies its single Bradford D65->D50 adaptation.
+    // DNG ColorMatrix convention is XYZ->camera; Develop inverts it to get
+    // camera->XYZ. The decoder reports cam_to_xyz, so store its inverse —
+    // storing cam_to_xyz makes Develop invert a second time and shift hues.
+    // Develop applies its single Bradford D65->D50 adaptation afterwards.
     for (int i = 0; i < 9; ++i) {
       ctx.color_matrix_1_[i] = profile->xyz_to_cam[i];
       ctx.color_matrix_2_[i] = profile->xyz_to_cam[i];
@@ -206,7 +208,23 @@ void MetadataExtractor::ExtractEXIF_ToImage(const image_path_t& image_path, Imag
     ctx.color_matrix_2_cct_            = 6504.0;
     ctx.forward_matrices_valid_        = false;
     ctx.as_shot_neutral_valid_         = true;
-    ctx.as_shot_neutral_[0] = ctx.as_shot_neutral_[1] = ctx.as_shot_neutral_[2] = 1.0;
+    // The white balance lives in cam_to_xyz, so the camera-space white point is
+    // xyz_to_cam * D65 — not unit RGB. Naming it correctly makes the as-shot
+    // solve return D65 with unit gain; unit RGB instead reads as ~2000 K and
+    // drags the frame green.
+    {
+      constexpr double kD65[3] = {0.95047, 1.0, 1.08883};
+      double           neutral[3];
+      for (int r = 0; r < 3; ++r) {
+        neutral[r] = profile->xyz_to_cam[r * 3 + 0] * kD65[0] +
+                     profile->xyz_to_cam[r * 3 + 1] * kD65[1] +
+                     profile->xyz_to_cam[r * 3 + 2] * kD65[2];
+      }
+      const double g = neutral[1] > 1e-9 ? neutral[1] : 1.0;
+      ctx.as_shot_neutral_[0] = neutral[0] / g;
+      ctx.as_shot_neutral_[1] = 1.0;
+      ctx.as_shot_neutral_[2] = neutral[2] / g;
+    }
     // dng_profile_ intentionally stays an empty (unbound) reference.
     image.SetRawColorContext(std::move(ctx));
     return;

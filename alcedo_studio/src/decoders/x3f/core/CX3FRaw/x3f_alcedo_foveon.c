@@ -106,7 +106,11 @@ void x3f_alcedo_edit_default(x3f_alcedo_edit_t *e) {
  *   Merrill / classic    -> sky neutralisation 3 wins; hole-fix forced off,
  *                           overexposure selector greyed to "off" (mode 4)
  * effectiveRawEdit() clears merrillHlNeut on Quattro and clears the
- * overexposure switches on non-Quattro; both are reproduced here. */
+ * overexposure switches on non-Quattro; both are reproduced here.
+ *
+ * `model_class` here is the GATE generation (x3f_alcedo_model_gen), not the
+ * narrow array probe: SD Quattro / SD Quattro H are Quattro for every
+ * overexposure decision in X3Lumina even though their type_format differs. */
 int x3f_alcedo_foveon_resolve_oe(const x3f_alcedo_edit_t *e, int model_class) {
     if (!e) return 4;
     if (model_class == X3F_ALCEDO_QUATTRO) {
@@ -185,8 +189,11 @@ int x3f_alcedo_foveon_prepare(const char *path, const x3f_alcedo_edit_t *edit,
     }
 
     const int model = x3f_alcedo_model_class(use);
-    const int oe    = x3f_alcedo_foveon_resolve_oe(edit, model);
-    const int quattro = (model == X3F_ALCEDO_QUATTRO);
+    /* Gate decisions follow the Quattro *generation* (DP-Q + SDQ + SDQH + SFD);
+     * the narrow array probe would grey out SDQ/SDQH's oe and sdq_hl controls. */
+    const int gen   = x3f_alcedo_model_gen(use);
+    const int oe    = x3f_alcedo_foveon_resolve_oe(edit, gen);
+    const int quattro = (gen == X3F_ALCEDO_QUATTRO);
 
     x3f_denoise_t dn;
     x3f_denoise_default(&dn);
@@ -200,6 +207,12 @@ int x3f_alcedo_foveon_prepare(const char *path, const x3f_alcedo_edit_t *edit,
     x3f_hole_fix_set_enabled((edit->hole_fix && quattro) ? 1 : 0);
     x3f_render_set_oe_neutralize(oe);
     x3f_render_set_oe_hlp(0);
+    /* "SDQ 高光" normalisation strength. This was previously declared in the
+     * edit struct but never forwarded, so the slider was inert on every body.
+     * It is APPLY-level in the C chain (sdq_dig is read at load time and stays
+     * fixed), hence it is not part of the decode key either. Non-SDQ files
+     * multiply by 1.0 exactly, so forwarding it is a no-op there. */
+    x3f_render_set_sdq_hl(edit->sdq_hl);
     const char *wb = edit->wb_preset[0] ? edit->wb_preset : NULL;
     const int   rc = x3f_render_load_wb(use, edit->down > 0 ? edit->down : 1,
                                         wb, edit->nlm, &dn,

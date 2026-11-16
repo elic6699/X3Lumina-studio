@@ -577,10 +577,11 @@ void ExecuteOpenClDevelop(OpenClRenderDevice& device, const ExecutionPlan& plan,
       backend.UploadDeviceMemory(uploaded, input.pixels, device.CommandContext());
     }
     auto stream = MakeEncodeQueue(device);
-    {
+    // DirectRgb input is already scene-linear with no rgb_linearization params;
+    // linearizing it with a default-constructed set would scale pixels to zero.
+    if (input.rgb_linearization.has_value()) {
       diag::PreviewSubStageInterval linearize(diag::PreviewSubStageKind::Linearize);
-      OpenCL::EncodeLinearizeRgb(stream, source, width, height,
-                                 input.rgb_linearization.value_or(RawRgbLinearizationParams{}));
+      OpenCL::EncodeLinearizeRgb(stream, source, width, height, *input.rgb_linearization);
     }
     auto& decoded = AcquireRgba(workspace, demosaic_id, out_w, out_h);
     if (hlr && input.rgb_linearization.has_value()) {

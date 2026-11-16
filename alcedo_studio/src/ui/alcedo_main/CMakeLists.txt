@@ -184,6 +184,13 @@ add_library(AlbumBackendLib STATIC
     "${ALCEDO_UI_SHELL_ROOT}/album_backend/import_export.cpp"
     "${ALCEDO_UI_SHELL_ROOT}/album_backend/nikon_he_recovery_controller.cpp"
     "${ALCEDO_UI_SHELL_ROOT}/album_backend/editor_session_controller.cpp"
+    # Path B (Foveon native chain): independent display-referred CPU sidecar.
+    "${ALCEDO_SRC_ROOT}/app/foveon_edit_params_io.cpp"
+    "${ALCEDO_INCLUDE_ROOT}/app/foveon_edit_params_io.hpp"
+    "${ALCEDO_UI_SHELL_ROOT}/album_backend/foveon_session_controller.cpp"
+    "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/album_backend/foveon_session_controller.hpp"
+    "${ALCEDO_UI_SHELL_ROOT}/album_backend/foveon_export_writer.cpp"
+    "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/album_backend/foveon_export_writer.hpp"
     "${ALCEDO_UI_SHELL_ROOT}/album_backend/editor_mask_creation_adapter.cpp"
     "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/album_backend/editor_mask_creation_adapter.hpp"
     "${ALCEDO_UI_SHELL_ROOT}/album_backend/editor_ai_mask_tool.cpp"
@@ -422,6 +429,11 @@ target_link_libraries(AlbumBackendLib
         EditPipeline
         PipelineScheduler
         ImageLoader
+        # Independent 16-bit sRGB writer for the path-B / SPP finished image.
+        ImageWriter
+        ExportIccProfileResolver
+        # Native X3F/X3I decoder bridge (path B C++ wrapper).
+        alcedo_x3f_support
         xxHash
         CudaDriverRequirements
         PreviewPerformance
@@ -954,6 +966,7 @@ set(ALCEDO_MAIN_QML_FILES
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorDisplayTransformPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorGeometryPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorRawDecodePanel.qml"
+    "${ALCEDO_UI_SHELL_ROOT}/qml/EditorFoveonPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/LensCatalogPicker.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/FilmStockPicker.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/FilmSwatch.qml"

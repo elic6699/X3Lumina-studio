@@ -5,7 +5,9 @@
 #include "edit/input/x3f_input_loader.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
@@ -58,9 +60,12 @@ void FillColorContext(PreparedRawInput& input, const X3fColorProfile& profile) {
   ctx.camera_make_                   = "SIGMA";
   ctx.cam_mul_[0] = ctx.cam_mul_[1] = ctx.cam_mul_[2] = 1.0f;
   ctx.pre_mul_[0] = ctx.pre_mul_[1] = ctx.pre_mul_[2] = 1.0f;
+  // Develop consumes color_matrix_1_ in the DNG ColorMatrix convention
+  // (XYZ -> camera) and inverts it to obtain camera -> XYZ. The decoder hands
+  // us cam_to_xyz, so the inverse direction is the one to store; passing
+  // cam_to_xyz here makes Develop invert twice and skews every hue.
   for (int i = 0; i < 9; ++i) {
-    // Both fields use the XYZ -> camera convention; cam_xyz_ is float storage.
-    ctx.cam_xyz_[i] = static_cast<float>(profile.xyz_to_cam[i]);
+    ctx.cam_xyz_[i]        = static_cast<float>(profile.cam_to_xyz[i]);
     ctx.color_matrix_1_[i] = profile.xyz_to_cam[i];
     ctx.color_matrix_2_[i] = profile.xyz_to_cam[i];
   }
@@ -69,7 +74,24 @@ void FillColorContext(PreparedRawInput& input, const X3fColorProfile& profile) {
   ctx.color_matrix_1_cct_            = 6504.0;
   ctx.color_matrix_2_cct_            = 6504.0;
   ctx.as_shot_neutral_valid_         = true;
-  ctx.as_shot_neutral_[0] = ctx.as_shot_neutral_[1] = ctx.as_shot_neutral_[2] = 1.0;
+  // The decoder emits pixels whose white balance is already carried by
+  // cam_to_xyz, so unit camera RGB is NOT the neutral: the camera-space white
+  // point is xyz_to_cam * D65. Naming that neutral lets Develop's as-shot
+  // solve land on D65 with unit gain instead of inventing a second balance
+  // (which used to read unit RGB as ~2000 K and drag the whole frame green).
+  {
+    constexpr double kD65[3] = {0.95047, 1.0, 1.08883};
+    double           neutral[3];
+    for (int r = 0; r < 3; ++r) {
+      neutral[r] = profile.xyz_to_cam[r * 3 + 0] * kD65[0] +
+                   profile.xyz_to_cam[r * 3 + 1] * kD65[1] +
+                   profile.xyz_to_cam[r * 3 + 2] * kD65[2];
+    }
+    const double g = neutral[1] > 1e-9 ? neutral[1] : 1.0;
+    ctx.as_shot_neutral_[0] = neutral[0] / g;
+    ctx.as_shot_neutral_[1] = 1.0;
+    ctx.as_shot_neutral_[2] = neutral[2] / g;
+  }
   ctx.forward_matrices_valid_ = false;
   // dng_profile_ stays an empty (unbound) reference: X3F has no DNG profile and
   // DngColorProfileRef::RequireBound() must not throw for such a reference.

@@ -181,7 +181,9 @@ else()
   set(X3F_HOST_INCLUDE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 endif()
 
-add_library(alcedo_x3f_support STATIC x3f_support.cpp)
+add_library(alcedo_x3f_support STATIC
+    x3f_support.cpp
+    x3f_foveon.cpp)
 target_include_directories(alcedo_x3f_support PUBLIC
     "${X3F_HOST_INCLUDE_ROOT}" "${X3F_CORE_INC}")
 # The C++ support layer now also owns the scene-linear decode bridge (colour
@@ -199,6 +201,11 @@ if(ALCEDO_X3F_BUILD_TOOLS)
   target_link_libraries(x3fprobe PRIVATE alcedo_x3fraw)
   add_executable(sfdbench tools/sfdbench.c)
   target_link_libraries(sfdbench PRIVATE alcedo_x3fraw)
+
+  # C++ path-B bridge smoke: defaults, two-stage caching, decode-key
+  # invalidation and the 16-bit sRGB output contract.
+  add_executable(foveon_bridge_smoke tools/foveon_bridge_smoke.cpp)
+  target_link_libraries(foveon_bridge_smoke PRIVATE alcedo_x3f_support)
 endif()
 
 message(STATUS "alcedo_x3f: GPU=${ALCEDO_X3F_GPU} cargo=${ALCEDO_X3F_CARGO} "

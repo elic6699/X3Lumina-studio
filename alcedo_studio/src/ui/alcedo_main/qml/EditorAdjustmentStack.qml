@@ -59,6 +59,9 @@ Item {
     readonly property var navItems: [
         { key: "raw", icon: "qrc:/panel_icons/aperture.svg",
           label: qsTr("RAW Decode"), itemObjectName: "editorAdjustmentNav_raw" },
+        { key: "foveon", icon: "qrc:/panel_icons/aperture.svg",
+          label: qsTr("Foveon"), itemObjectName: "editorAdjustmentNav_foveon",
+          enabled: appModules.foveonSession ? appModules.foveonSession.available : false },
         { key: "geometry", icon: "qrc:/panel_icons/crop.svg",
           label: qsTr("Geometry"), itemObjectName: "editorAdjustmentNav_geometry" },
         { key: "tone", icon: "qrc:/panel_icons/adjustments.svg",
@@ -196,6 +199,7 @@ Item {
         case "post": return qsTr("Post Processing")
         case "geometry": return qsTr("Geometry")
         case "raw": return qsTr("RAW Decode")
+        case "foveon": return qsTr("Foveon Native Chain")
         case "masks": return qsTr("Mask")
         case "compare": return qsTr("Compare")
         default: return qsTr("Tone")
@@ -306,6 +310,7 @@ Item {
                         case "raw": return 6
                         case "masks": return 7
                         case "compare": return 8
+                        case "foveon": return 9
                         default: return 0
                         }
                     }
@@ -403,6 +408,15 @@ Item {
                         onSwapRequested: root.comparison.swap()
                         onRetryRequested: root.comparison.retry()
                         onCloseRequested: root.comparison.close()
+                    }
+
+                    // Path B: independent display-referred Foveon native chain.
+                    EditorFoveonPanel {
+                        id: foveonPanel
+                        objectName: "editorAdjustmentPanel_foveon"
+                        theme: root.theme
+                        editorSession: root.editorSession
+                        controlsEnabled: root.controlsEnabled
                     }
                 }
             }

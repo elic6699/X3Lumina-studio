@@ -37,6 +37,14 @@ extern int  x3f_own_dispatch_scene_linear(const char *path, float **data,
 extern void x3f_decoder_set_override(const char *d);
 extern int  x3f_render_probe_is_quattro(const char *path);
 extern int  x3f_render_probe_is_merrill(const char *path);
+extern int  x3f_render_probe_is_quattro_gen(const char *path);
+extern int  x3f_render_probe_is_sdq_body(const char *path);
+extern int  x3f_render_probe_sdq_hl(const char *path);
+/* CAMF reader from the render layer (declared by hand because x3f_render.h
+ * pulls in the legacy x3f_t layout, which this file deliberately avoids). */
+extern int  x3f_camf_matrix_f64(const char *path, const char *name,
+                                double *out, int n, unsigned *dims);
+#define X3F_CAMF_DIMS_LOCAL 3
 
 /* x3fuse metadata-only helpers (libx3f.a). Declared with void* so the vendor
  * x3f_t layout stays out of this translation unit (the legacy tree defines
@@ -120,10 +128,35 @@ const char *x3f_alcedo_export_error(void) { return g_error; }
 
 int x3f_alcedo_model_class(const char *path) {
     if (!path || !*path) return X3F_ALCEDO_CLASSIC;
-    /* Both probes handle X3I containers internally, so no frame is materialized. */
-    if (x3f_render_probe_is_quattro(path)) return X3F_ALCEDO_QUATTRO;
+    /* Decode-backend grain, not the array grain: SD Quattro / SD Quattro H are
+     * Quattro bodies with their own RAW type_format (0x25 / 0x27) and must use
+     * own decoding like every other Quattro. The render layer keeps its narrow
+     * probe where the distinction matters (Quattro green calibration). */
+    if (x3f_render_probe_is_quattro_gen(path)) return X3F_ALCEDO_QUATTRO;
     if (x3f_render_probe_is_merrill(path)) return X3F_ALCEDO_MERRILL;
     return X3F_ALCEDO_CLASSIC;
+}
+
+/* SD Quattro / SD Quattro H 是独立的 type_format（0x25 / 0x27），旧探针只认
+ * DP-Q 的 0x23。面板门控必须用这个更宽的世代口径，否则 SDQ/SDQH 的过曝矫正
+ * 与 SDQ 高光会被误置灰（2026-11-16 实测报障）。 */
+int x3f_alcedo_model_gen(const char *path) {
+    if (!path || !*path) return X3F_ALCEDO_CLASSIC;
+    if (x3f_render_probe_is_quattro_gen(path)) return X3F_ALCEDO_QUATTRO;
+    if (x3f_render_probe_is_merrill(path)) return X3F_ALCEDO_MERRILL;
+    return X3F_ALCEDO_CLASSIC;
+}
+
+int x3f_alcedo_sdq_hl_capable(const char *path) {
+    if (!path || !*path) return 0;
+    /* Body-based, not gain-based: SDQ reports DigitalISOGain=(1,1,1) yet still
+     * exposes the slider in X3Lumina. SDQH actually normalises (4,4,2). */
+    return x3f_render_probe_is_sdq_body(path) ? 1 : 0;
+}
+
+int x3f_alcedo_sdq_hl_effective(const char *path) {
+    if (!path || !*path) return 0;
+    return x3f_render_probe_sdq_hl(path) ? 1 : 0;
 }
 
 int x3f_alcedo_available_decoders(const char *path) {
@@ -187,6 +220,27 @@ int x3f_alcedo_probe_color(const char *path, int frame, double cam_to_xyz[9]) {
         char *wb = x3f_get_wb(x3f);
         if (x3f_get_raw_to_xyz(x3f, wb, cam_to_xyz) == 1) rc = X3F_ALCEDO_OK;
         x3f_delete(x3f);
+    }
+    if (rc == X3F_ALCEDO_OK) {
+        /* The decoder folds DigitalISOGain into camera_to_rgb as a column
+         * scale, so the emitted pixels carry it. The probe matrix must carry
+         * it too, otherwise the document profile and the decoded values differ
+         * by that diagonal and the frame shifts colour (SDQH is 4,4,2 and shows
+         * up as a green cast). DP-Q / Merrill / SDQ report 1,1,1 and are
+         * bit-identical. */
+        double   dg[3]                    = {1.0, 1.0, 1.0};
+        unsigned dims[X3F_CAMF_DIMS_LOCAL] = {1, 1, 1};
+        if (x3f_camf_matrix_f64(use, "DigitalISOGain", dg, 3, dims) == 3) {
+            int valid = 1;
+            for (int i = 0; i < 3; ++i) {
+                if (!(dg[i] > 0.0) || dg[i] > 64.0) valid = 0;
+            }
+            if (valid) {
+                for (int r = 0; r < 3; ++r) {
+                    for (int c = 0; c < 3; ++c) cam_to_xyz[r * 3 + c] *= dg[c];
+                }
+            }
+        }
     }
     fclose(f);
     x3f_temp_release(tmp);
@@ -327,6 +381,26 @@ static int export_linear_impl(const char *path, int frame,
 
     memcpy(out->cam_xyz, M, sizeof(M));
     memcpy(out->camera_to_rgb, camera_to_rgb, sizeof(camera_to_rgb));
+
+    /* Diagnostic for colour calibration: M is the matrix that the pixels above
+     * are expressed in, C = inv(M)*sRGB_to_XYZ, i.e. the linear map applied to
+     * the decoder's extended-linear sRGB. M * (1,1,1) tells whether unit camera
+     * RGB is D65 (as_shot_neutral = 1,1,1 is only valid when it is). */
+    if (getenv("X3F_ALCEDO_DEBUG_COLOR")) {
+        const double w0 = M[0] + M[1] + M[2];
+        const double w1 = M[3] + M[4] + M[5];
+        const double w2 = M[6] + M[7] + M[8];
+        fprintf(stderr, "[color] M = [%g %g %g; %g %g %g; %g %g %g]\n",
+                M[0], M[1], M[2], M[3], M[4], M[5], M[6], M[7], M[8]);
+        fprintf(stderr, "[color] M*(1,1,1) = [%g %g %g]  (D65 = 0.9505 1 1.089)\n",
+                w0, w1, w2);
+        fprintf(stderr, "[color] decoder camera_to_rgb = [%g %g %g; %g %g %g; %g %g %g]\n",
+                camera_to_rgb[0], camera_to_rgb[1], camera_to_rgb[2],
+                camera_to_rgb[3], camera_to_rgb[4], camera_to_rgb[5],
+                camera_to_rgb[6], camera_to_rgb[7], camera_to_rgb[8]);
+        fprintf(stderr, "[color] C = inv(M)*srgb_to_xyz = [%g %g %g; %g %g %g; %g %g %g]\n",
+                C[0], C[1], C[2], C[3], C[4], C[5], C[6], C[7], C[8]);
+    }
 
     out->rgb          = data;
     out->width        = (int)w;
@@ -487,6 +561,171 @@ int x3f_alcedo_export_spp16(const char *path, int frame,
     out->rgb         = buf;
     out->width       = w;
     out->height      = h;
+    out->orientation = orientation;
+    return X3F_ALCEDO_OK;
+}
+
+/* ---- SPP tone-stage bridge: the six X3Lumina sliders stay in SPP's own tone
+ * stage. They are not Alcedo Develop-DAG parameters: the DAG works in
+ * ACEScc/AP1 and has no equivalent of SPP's camera-code-value tone curve. ---- */
+struct x3f_alcedo_spp_session {
+    struct x3f_spp_prepared *prepared;
+    int  width;
+    int  height;
+    int  orientation;
+    int  nr_level;
+    char temp_path[1024];
+};
+
+int x3f_alcedo_spp_session_open(const char *path, int frame, int nr_level,
+                                x3f_alcedo_spp_session **out,
+                                int *w, int *h) {
+    if (w) *w = 0;
+    if (h) *h = 0;
+    if (!out || !path || !*path) {
+        set_error("x3f_alcedo_spp_session_open: null argument");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    *out = NULL;
+    if (nr_level < -1 || nr_level > 4) {
+        set_error("x3f_alcedo_spp_session_open: nr_level must be -1 or 0..4");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    char tmp[1024] = {0};
+    const char *use = x3f_standalone_path(path, frame < 0 ? -1 : frame,
+                                          tmp, sizeof(tmp));
+    if (!use || !*use) {
+        set_error("x3f_alcedo_spp_session_open: cannot materialize frame");
+        return X3F_ALCEDO_ERR_CONTAINER;
+    }
+
+    struct x3f_spp_prepared *prepared = NULL;
+    int ow = 0, oh = 0;
+    lock_decoder();
+    x3f_render_spp_set_enabled(1);
+    const int rc = x3f_render_spp_prepare(use, nr_level, &prepared, &ow, &oh);
+    x3f_render_spp_set_enabled(-1);
+    unlock_decoder();
+
+    if (rc != X3FRENDER_OK || prepared == NULL || ow <= 0 || oh <= 0) {
+        if (prepared != NULL) x3f_render_spp_prepared_free(prepared);
+        x3f_temp_release(tmp);
+        set_error("x3f_alcedo_spp_session_open: SPP prepare failed");
+        return X3F_ALCEDO_ERR_DECODE;
+    }
+
+    x3f_alcedo_spp_session *session =
+        (x3f_alcedo_spp_session *)calloc(1, sizeof(*session));
+    if (session == NULL) {
+        x3f_render_spp_prepared_free(prepared);
+        x3f_temp_release(tmp);
+        set_error("x3f_alcedo_spp_session_open: out of memory");
+        return X3F_ALCEDO_ERR_NOMEM;
+    }
+    session->prepared = prepared;
+    session->width = ow;
+    session->height = oh;
+    session->nr_level = nr_level;
+    const int orientation = x3f_alcedo_header_orientation(use);
+    session->orientation = (orientation >= 1 && orientation <= 8) ? orientation : 1;
+    if (tmp[0] != '\0') {
+        snprintf(session->temp_path, sizeof(session->temp_path), "%s", tmp);
+    }
+    *out = session;
+    if (w) *w = ow;
+    if (h) *h = oh;
+    return X3F_ALCEDO_OK;
+}
+
+int x3f_alcedo_spp_session_apply(x3f_alcedo_spp_session *session,
+                                 const x3f_alcedo_spp_tone_t *tone,
+                                 uint16_t *dst, int stride, int *w, int *h) {
+    if (w) *w = 0;
+    if (h) *h = 0;
+    if (!session || !session->prepared || !tone || !dst) {
+        set_error("x3f_alcedo_spp_session_apply: null argument");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    if (tone->nr_level != session->nr_level) {
+        set_error("x3f_alcedo_spp_session_apply: nr_level differs from prepare");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    if (stride < session->width * 3 * (int)sizeof(uint16_t)) {
+        set_error("x3f_alcedo_spp_session_apply: stride too small");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    int ow = session->width;
+    int oh = session->height;
+    lock_decoder();
+    x3f_render_spp_set_enabled(1);
+    const int rc = x3f_render_spp_apply_tone(
+        session->prepared, dst, stride, &ow, &oh, tone->exposure, tone->contrast,
+        tone->shadows, tone->highlights, tone->saturation, tone->nr_level);
+    x3f_render_spp_set_enabled(-1);
+    unlock_decoder();
+    if (rc != X3FRENDER_OK) {
+        set_error("x3f_alcedo_spp_session_apply: SPP tone stage failed");
+        return X3F_ALCEDO_ERR_DECODE;
+    }
+    if (w) *w = ow;
+    if (h) *h = oh;
+    return X3F_ALCEDO_OK;
+}
+
+int x3f_alcedo_spp_session_orientation(const x3f_alcedo_spp_session *session) {
+    if (!session) return 1;
+    return (session->orientation >= 1 && session->orientation <= 8)
+               ? session->orientation
+               : 1;
+}
+
+void x3f_alcedo_spp_session_close(x3f_alcedo_spp_session *session) {
+    if (!session) return;
+    if (session->prepared != NULL) {
+        x3f_render_spp_prepared_free(session->prepared);
+        session->prepared = NULL;
+    }
+    x3f_temp_release(session->temp_path);
+    free(session);
+}
+
+int x3f_alcedo_spp_tone_export(const char *path, int frame,
+                               const x3f_alcedo_spp_tone_t *tone,
+                               x3f_alcedo_spp16_t *out) {
+    if (!out || !tone || !path || !*path) {
+        set_error("x3f_alcedo_spp_tone_export: null argument");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    memset(out, 0, sizeof(*out));
+
+    x3f_alcedo_spp_session *session = NULL;
+    int w = 0, h = 0;
+    int rc = x3f_alcedo_spp_session_open(path, frame, tone->nr_level, &session,
+                                         &w, &h);
+    if (rc != X3F_ALCEDO_OK || !session || w <= 0 || h <= 0) {
+        if (session) x3f_alcedo_spp_session_close(session);
+        return rc != X3F_ALCEDO_OK ? rc : X3F_ALCEDO_ERR_DECODE;
+    }
+
+    const size_t n = (size_t)w * (size_t)h * 3u;
+    uint16_t *buf = (uint16_t *)calloc(n, sizeof(uint16_t));
+    if (!buf) {
+        x3f_alcedo_spp_session_close(session);
+        set_error("x3f_alcedo_spp_tone_export: out of memory");
+        return X3F_ALCEDO_ERR_NOMEM;
+    }
+
+    rc = x3f_alcedo_spp_session_apply(session, tone, buf,
+                                      w * 3 * (int)sizeof(uint16_t), &w, &h);
+    const int orientation = x3f_alcedo_spp_session_orientation(session);
+    x3f_alcedo_spp_session_close(session);
+    if (rc != X3F_ALCEDO_OK) {
+        free(buf);
+        return rc;
+    }
+    out->rgb = buf;
+    out->width = w;
+    out->height = h;
     out->orientation = orientation;
     return X3F_ALCEDO_OK;
 }

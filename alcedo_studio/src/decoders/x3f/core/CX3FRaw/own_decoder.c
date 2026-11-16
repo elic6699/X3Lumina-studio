@@ -6499,16 +6499,19 @@ int x3f_own_dispatch_scene_linear(const char *path, float **data, unsigned *w,
         return 1;
     }
 
-    /* sd Quattro H：无论 GUI 选了哪个解码档，一律走 x3fuse。
-     * 只命中 type_format==0x00010027 的文件；其它机型 force_own /
-     * prefer_own 的取值与门控前逐位相同。 */
+    /* sd Quattro H 默认走 **own**：X3Lumina 的 own 解码在 SDQH 上色彩是准的
+     * （0184 中性点与机内 JPEG 差 <1/255），而 x3fuse 那条路有 ~5% 的绿偏，
+     * 且要靠 +0.5 EV 硬补亮度。所以这里不再强制 fuse。
+     *
+     * 历史逃生开关保留为 opt-in：X3FDEC_SDQH_FUSE=1 才回 x3fuse（并启用下面
+     * 的 SDQH 曝光补偿）；设 0 或不设都走 own，与其它 Quattro 一致。 */
     {
         const char *sf = getenv("X3FDEC_SDQH_FUSE");
-        if (!(sf && sf[0] == '0') && own_is_sdqh_file(path)) {
+        if (sf && sf[0] == '1' && own_is_sdqh_file(path)) {
             force_own = prefer_own = 0;
             sdqh_fuse = 1;
             if (getenv("X3FDEC_SDQH_DEBUG"))
-                fprintf(stderr, "[dispatch] SDQH -> x3fuse (%s)\n", path);
+                fprintf(stderr, "[dispatch] SDQH -> x3fuse (escape switch)\n");
         }
     }
 

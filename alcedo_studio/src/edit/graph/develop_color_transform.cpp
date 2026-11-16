@@ -791,9 +791,27 @@ auto ResolveDevelopColorTransform(const DevelopPayload& develop) -> ColorTransfo
   double    selected_cct  = develop.custom_cct;
   double    selected_tint = develop.custom_tint;
   if (!IsCustomWbMode(develop.wb_mode)) {
+    // An as-shot solve that has no finite root is not a reason to refuse to show
+    // the photo: the pixels already carry the decoder's own balance (X3F records
+    // unit camera RGB as the neutral while the fuse matrix disagrees), so D65 is
+    // the honest fallback. Cameras whose neutral and matrix agree never reach
+    // this branch.
     if (!SolveAsShotWhiteXY(camera_profile, cm1, cm2, endpoint_cct_1, endpoint_cct_2, selected_xy,
                             selected_cct, selected_tint)) {
-      return Fail(ColorTransformError::InvalidAsShotNeutral);
+      selected_cct  = 6500.0;
+      selected_tint = 0.0;
+      selected_xy   = UVToXY(TemperatureTintToUV(selected_cct, selected_tint));
+    }
+    // A solve that pins the CCT at the lower clamp means the camera matrix and
+    // the as-shot neutral disagree (X3F Merrill: the fuse decode already applied
+    // the white balance, so the matrix maps unit camera RGB to ~2000 K). The
+    // resulting gain crushes the frame to black, which is never a real white
+    // point for a normal capture. Treat it as "no usable as-shot white" and fall
+    // back to D65, matching the balance the decoder already produced.
+    if (selected_cct <= kCustomCCTMin + 1.0) {
+      selected_cct  = 6500.0;
+      selected_tint = 0.0;
+      selected_xy   = UVToXY(TemperatureTintToUV(selected_cct, selected_tint));
     }
   } else {
     selected_cct  = ClampFinite(develop.custom_cct, kCustomCCTMin, kCustomCCTMax);

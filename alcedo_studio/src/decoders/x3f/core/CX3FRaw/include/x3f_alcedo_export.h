@@ -68,8 +68,28 @@ typedef struct {
     int     model_class;
 } x3f_alcedo_linear_t;
 
-/* 只读文件头判定机型（不解码整帧）。返回 X3F_ALCEDO_CLASSIC/MERRILL/QUATTRO。 */
+/* 只读文件头判定机型（不解码整帧）。返回 X3F_ALCEDO_CLASSIC/MERRILL/QUATTRO。
+ *
+ * 注意：这是**像素阵列口径**（X3F_IMAGE_RAW_QUATTRO = 0x23）。SD Quattro /
+ * SD Quattro H 在 X3F 里是独立的 type_format（SDQ=0x25 / SDQH=0x27），不算
+ * QUATTRO。解码后端选择与绿增强用它（历史口径，保持不动）。 */
 int x3f_alcedo_model_class(const char *path);
+
+/* **门控口径**的世代：SDQ / SDQH / SFD 容器与 DP-Q 一起返回 QUATTRO。
+ *
+ * 过曝矫正（oe mode8）、hole-fix、SDQ 高光这三项在 X3Lumina 里按「Quattro
+ * 世代」而不是「Quattro 阵列」门控；用 model_class 判断会把 SDQ/SDQH 误置灰
+ * （2026-11-16 用户实测报障）。面板置灰与 oe 解析一律用本函数。 */
+int x3f_alcedo_model_gen(const char *path);
+
+/* 本文件是否 SD Quattro / SD Quattro H 机身（RAW type_format SDQ / SDQH）——
+ * 「SDQ 高光」滑杆的**门控**口径：X3Lumina 在两种 SDQ 机身上都摆滑杆。 */
+int x3f_alcedo_sdq_hl_capable(const char *path);
+
+/* 该文件的 DigitalISOGain 是否偏离 (1,1,1)——归一在该机身上是否**真的**
+ * 改变像素（SDQH 4,4,2 = 有效；SDQ 1,1,1 = 滑杆可拖但乘 1.0 无变化）。
+ * 诊断用，不要拿它做面板门控。 */
+int x3f_alcedo_sdq_hl_effective(const char *path);
 
 /* 该机型可用的解码后端位掩码，供 UI 置灰与参数校验。 */
 int x3f_alcedo_available_decoders(const char *path);
@@ -146,6 +166,56 @@ typedef struct {
     int       height;
     int       orientation;       /* EXIF 1..8, sensor-order image              */
 } x3f_alcedo_spp16_t;
+
+/* ---------------------------------------------------------------------------
+ * SPP tone-stage controls (Merrill native chain only).
+ *
+ * These values are applied by SPP itself, in its own camera-code-value tone
+ * stage, *before* the sRGB OETF. They are NOT Alcedo Develop-DAG parameters:
+ * Alcedo's exposure/contrast/saturation live in ACEScc/AP1 and shadows /
+ * highlights are an LLF operator, so reusing those would change the product
+ * and is deliberately not done here.
+ *
+ * Field semantics follow x3f_render_spp_export_tone():
+ *   exposure     EV, positive brightens
+ *   contrast     added to the CAMF contrast calibration
+ *   shadows      positive lifts the shadows
+ *   highlights   SPP semantics: positive lifts highlights. The X3Lumina UI
+ *                uses the opposite sign for its "高光" slider, so the host
+ *                bridge negates it before filling this struct.
+ *   saturation   SPP slider units -2..+2, 0 = native
+ *   nr_level     0..4 body-calibrated denoise row; -1 = native middle row.
+ *                This one is baked into the prepared buffer, so changing it
+ *                forces a new prepare().
+ * ------------------------------------------------------------------------- */
+typedef struct {
+    double exposure;
+    double contrast;
+    double shadows;
+    double highlights;
+    double saturation;
+    int    nr_level;
+} x3f_alcedo_spp_tone_t;
+
+/* One-shot SPP tone export. Equivalent to open + apply + close; out->rgb is
+ * released with x3f_alcedo_spp16_free(). */
+int  x3f_alcedo_spp_tone_export(const char *path, int frame,
+                                const x3f_alcedo_spp_tone_t *tone,
+                                x3f_alcedo_spp16_t *out);
+
+/* Two-stage SPP tone session: prepare (decode + float front end + NR) is the
+ * expensive half and stays cached; apply() re-runs only the tone stage. The
+ * prepared buffer is owned by the session; the destination is caller-owned. */
+typedef struct x3f_alcedo_spp_session x3f_alcedo_spp_session;
+
+int  x3f_alcedo_spp_session_open(const char *path, int frame, int nr_level,
+                                 x3f_alcedo_spp_session **out, int *w, int *h);
+/* dst is width*height*3 uint16 samples; stride is in bytes. */
+int  x3f_alcedo_spp_session_apply(x3f_alcedo_spp_session *session,
+                                  const x3f_alcedo_spp_tone_t *tone,
+                                  uint16_t *dst, int stride, int *w, int *h);
+int  x3f_alcedo_spp_session_orientation(const x3f_alcedo_spp_session *session);
+void x3f_alcedo_spp_session_close(x3f_alcedo_spp_session *session);
 
 /* Cheap capability probe (header + CAMF only, no render). Returns 1 when the
  * SPP sidecar can produce this file and fills w/h; 0 otherwise. Used to grey
