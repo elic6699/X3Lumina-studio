@@ -166,7 +166,8 @@ typedef struct {
     int       width;
     int       height;
     int       orientation;  /* EXIF 1..8, image is in sensor order */
-    double   *linear_rgb;   /* non-NULL only when look_defer=1, w*h*3 f32-ish */
+    float    *linear_rgb;   /* non-NULL only when look_defer=1, w*h*3 f32
+                               linear-sRGB, unclamped (negatives and >1 kept) */
 } x3f_alcedo_foveon_image_t;
 
 /* Stage 2: re-run the display chain with the current look sliders. Cheap
@@ -176,6 +177,17 @@ typedef struct {
 int  x3f_alcedo_foveon_apply(x3f_alcedo_foveon_frame_t *frame,
                              const x3f_alcedo_edit_t *edit,
                              x3f_alcedo_foveon_image_t *out);
+
+/* Same front end, but ONLY the unclamped scene-linear pass: no 16-bit display
+ * encode at all. This is the Develop-DAG feed — it must stay linear so the
+ * host's exposure / colour / curve nodes own the tone response, and it must
+ * stay unclamped so wide-gamut and >1 headroom survive to the working space.
+ *
+ * look_defer is forced on; out->rgb stays NULL and out->linear_rgb is owned by
+ * the caller (release with x3f_alcedo_foveon_image_free). */
+int  x3f_alcedo_foveon_apply_linear(x3f_alcedo_foveon_frame_t *frame,
+                                    const x3f_alcedo_edit_t *edit,
+                                    x3f_alcedo_foveon_image_t *out);
 void x3f_alcedo_foveon_image_free(x3f_alcedo_foveon_image_t *image);
 
 /* Convenience: prepare + apply in one call (export / batch / tests). */

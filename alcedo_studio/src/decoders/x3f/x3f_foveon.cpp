@@ -346,6 +346,63 @@ auto FoveonDecodeKey(const FoveonEditParams& params) -> std::uint64_t {
   return x3f_alcedo_foveon_decode_key(&c);
 }
 
+namespace {
+
+/// FNV-1a over the raw bits of one field, so no rounding decisions sneak in.
+auto MixBits(std::uint64_t h, double v) -> std::uint64_t {
+  std::uint64_t bits = 0;
+  static_assert(sizeof(bits) == sizeof(v));
+  std::memcpy(&bits, &v, sizeof(bits));
+  for (int i = 0; i < 8; ++i) {
+    h = (h ^ ((bits >> (i * 8)) & 0xFFU)) * 1099511628211ULL;
+  }
+  return h;
+}
+
+auto MixInt(std::uint64_t h, std::int64_t v) -> std::uint64_t {
+  return MixBits(h, static_cast<double>(v));
+}
+
+}  // namespace
+
+auto FoveonLinearKey(const FoveonEditParams& params) -> std::uint64_t {
+  std::uint64_t h = FoveonDecodeKey(params);
+  // Apply-level operators that run before the deferred tone stage. Everything
+  // the Develop DAG owns (exposure / contrast / shadow / highlight /
+  // saturation / curve / split toning / mono / glow / out_space) is excluded.
+  h = MixBits(h, params.fill_light);
+  h = MixBits(h, params.fl_tune);
+  h = MixBits(h, params.fl_hlzred);
+  h = MixBits(h, params.fl_lmean_r);
+  h = MixBits(h, params.fl_msat);
+  h = MixBits(h, params.fl_mapgain);
+  h = MixBits(h, params.fl_k0off);
+  h = MixBits(h, params.fl_zgain);
+  h = MixBits(h, params.detail);
+  h = MixBits(h, params.sharpness);
+  h = MixBits(h, params.sharp_res);
+  h = MixBits(h, params.hl_recover);
+  h = MixBits(h, params.hl_keep);
+  h = MixBits(h, params.hl_chroma);
+  h = MixInt(h, params.hl_chroma_hue_gate ? 1 : 0);
+  h = MixInt(h, params.hlp_fix);
+  h = MixBits(h, params.sdq_hl);
+  h = MixInt(h, params.oe_m8od);
+  h = MixBits(h, params.wb_red);
+  h = MixBits(h, params.wb_green);
+  h = MixBits(h, params.wb_blue);
+  h = MixBits(h, params.wb_temp);
+  h = MixBits(h, params.wb_tint);
+  for (const char ch : params.wb_preset) {
+    h = (h ^ static_cast<unsigned char>(ch)) * 1099511628211ULL;
+  }
+  for (const char ch : params.color_mode) {
+    h = (h ^ static_cast<unsigned char>(ch)) * 1099511628211ULL;
+  }
+  h = MixBits(h, params.color_strength);
+  return h;
+}
+
 auto FoveonResolveOe(const FoveonEditParams& params, int model_class) -> int {
   const auto c = ToC(params);
   return x3f_alcedo_foveon_resolve_oe(&c, model_class);
@@ -433,6 +490,32 @@ auto FoveonFrame::Apply(const FoveonEditParams& params) const
   if (raw.linear_rgb != nullptr) {
     std::free(raw.linear_rgb);
   }
+  image.width       = raw.width;
+  image.height      = raw.height;
+  image.orientation = (raw.orientation >= 1 && raw.orientation <= 8)
+                          ? raw.orientation
+                          : 1;
+  return image;
+}
+
+auto FoveonFrame::ApplyLinear(const FoveonEditParams& params) const
+    -> std::optional<FoveonLinearImage> {
+  if (!handle_) {
+    return std::nullopt;
+  }
+  const auto c_params = ToC(params);
+  x3f_alcedo_foveon_image_t raw{};
+  if (x3f_alcedo_foveon_apply_linear(
+          static_cast<x3f_alcedo_foveon_frame_t*>(handle_.get()), &c_params,
+          &raw) != X3F_ALCEDO_OK ||
+      raw.linear_rgb == nullptr || raw.width <= 0 || raw.height <= 0) {
+    return std::nullopt;
+  }
+
+  FoveonLinearImage image;
+  image.rgb = std::shared_ptr<const float>(raw.linear_rgb, [](const float* p) {
+    std::free(const_cast<float*>(p));
+  });
   image.width       = raw.width;
   image.height      = raw.height;
   image.orientation = (raw.orientation >= 1 && raw.orientation <= 8)

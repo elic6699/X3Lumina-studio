@@ -9,6 +9,8 @@
 //   * prepare/apply caching: an apply-level slider changes the image but NOT
 //     the decode key (no re-decode),
 //   * a decode-level switch (mode8) invalidates the key and changes the image,
+//   * the Develop-DAG feed (ApplyLinear) stays unclamped (negatives and >1
+//     headroom preserved) and does not carry exposure — the DAG owns tone,
 //   * path A stays a separate, unclamped scene-linear wide-gamut source.
 
 #include <algorithm>
@@ -123,6 +125,58 @@ auto main(int argc, char** argv) -> int {
   std::cout << "render #1: " << image0->width << "x" << image0->height
             << " orientation=" << image0->orientation
             << " hash=0x" << std::hex << hash0 << std::dec << "\n";
+
+  // Develop-DAG feed: the linear product must stay unclamped so wide-gamut and
+  // highlight headroom survive, and it must NOT carry the tone sliders the DAG
+  // owns (otherwise every exposure drag re-decodes).
+  {
+    auto frame = alcedo::x3f::FoveonFrame::Prepare(path, params);
+    if (!frame) {
+      std::cerr << "FAIL: linear prepare: " << alcedo::x3f::FoveonLastError()
+                << "\n";
+      return 1;
+    }
+    const auto lin = frame->ApplyLinear(params);
+    if (!lin || lin->Empty()) {
+      std::cerr << "FAIL: ApplyLinear produced nothing: "
+                << alcedo::x3f::FoveonLastError() << "\n";
+      return 1;
+    }
+    const std::size_t n = static_cast<std::size_t>(lin->width) *
+                          static_cast<std::size_t>(lin->height) * 3U;
+    const float* px = lin->rgb.get();
+    float lo = px[0], hi = px[0];
+    std::size_t neg = 0, over = 0;
+    for (std::size_t i = 0; i < n; ++i) {
+      lo = std::min(lo, px[i]);
+      hi = std::max(hi, px[i]);
+      neg += px[i] < 0.0F ? 1U : 0U;
+      over += px[i] > 1.0F ? 1U : 0U;
+    }
+    std::cout << "linear: " << lin->width << "x" << lin->height
+              << " range=[" << lo << "," << hi << "]"
+              << " negative=" << neg << " over1=" << over << "\n";
+
+    // Exposure must be a DAG node, not a decode-time multiply.
+    auto p_expo     = params;
+    p_expo.exposure += 1.0;
+    const auto lin_e = frame->ApplyLinear(p_expo);
+    if (!lin_e || lin_e->Empty()) {
+      std::cerr << "FAIL: linear re-apply with exposure failed\n";
+      return 1;
+    }
+    double delta = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+      delta = std::max(delta, std::abs(static_cast<double>(lin_e->rgb.get()[i]) -
+                                       static_cast<double>(px[i])));
+    }
+    std::cout << "linear exposure +1EV max|delta|=" << delta << "\n";
+    if (delta > 1e-6) {
+      std::cerr << "FAIL: exposure leaks into the scene-linear feed; the DAG "
+                   "cannot own it\n";
+      return 1;
+    }
+  }
 
   // Apply-level: exposure must not invalidate the prepared linear frame.
   params.exposure += 0.5;

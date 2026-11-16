@@ -417,6 +417,60 @@ int x3f_alcedo_foveon_apply(x3f_alcedo_foveon_frame_t *f,
     return X3F_ALCEDO_OK;
 }
 
+int x3f_alcedo_foveon_apply_linear(x3f_alcedo_foveon_frame_t *f,
+                                   const x3f_alcedo_edit_t *edit,
+                                   x3f_alcedo_foveon_image_t *out) {
+    if (!f || !edit || !out) {
+        set_error("foveon_apply_linear: null argument");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+    memset(out, 0, sizeof(*out));
+    if (f->decode_key != x3f_alcedo_foveon_decode_key(edit)) {
+        set_error("foveon_apply_linear: decode-level parameter changed, call prepare() again");
+        return X3F_ALCEDO_ERR_ARG;
+    }
+
+    /* Force the linear semantics regardless of what the caller passed: this
+     * entry exists only to feed a scene-linear Develop DAG. Exposure is a
+     * pre-tone multiply inside apply_row, so it must be zeroed here or the host
+     * would apply it twice (the DAG's Exposure node owns it). Contrast /
+     * shadow / highlight / saturation / curves / split toning / mono / glow are
+     * display-domain and are already skipped by look_defer. */
+    x3f_alcedo_edit_t linear_edit = *edit;
+    linear_edit.look_defer        = 1;
+    linear_edit.exposure          = 0.0;
+
+    x3f_edit_params_t p;
+    build_params(f, &linear_edit, &p);
+
+    const size_t n = (size_t)f->w * (size_t)f->h * 3u;
+    float *lin = (float *)malloc(n * sizeof(float));
+    if (!lin) {
+        set_error("foveon_apply_linear: out of memory");
+        return X3F_ALCEDO_ERR_NOMEM;
+    }
+
+    int rc;
+    lock_legacy();
+    x3f_render_set_oe_tone_off(edit->hlp_fix ? 0 : 1);
+    x3f_render_set_hl9_odm8(edit->oe_m8od ? 1 : 0);
+    x3f_render_set_sdq_hl(edit->sdq_hl);
+    rc = x3f_render_apply_ex_linear(&p, f->lin, f->clip, f->w, f->h, lin);
+    unlock_legacy();
+
+    if (rc != X3FRENDER_OK) {
+        free(lin);
+        set_error("foveon_apply_linear: x3f_render_apply_ex_linear failed");
+        return X3F_ALCEDO_ERR_DECODE;
+    }
+    out->rgb         = NULL;
+    out->linear_rgb  = lin;
+    out->width       = f->w;
+    out->height      = f->h;
+    out->orientation = f->orientation;
+    return X3F_ALCEDO_OK;
+}
+
 int x3f_alcedo_foveon_render(const char *path, const x3f_alcedo_edit_t *edit,
                              x3f_alcedo_foveon_image_t *out) {
     x3f_alcedo_foveon_frame_t *f = NULL;

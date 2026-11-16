@@ -136,6 +136,14 @@ struct FoveonEditParams {
 /// Look sliders deliberately do not appear here.
 [[nodiscard]] auto FoveonDecodeKey(const FoveonEditParams& params) -> std::uint64_t;
 
+/// Hash of every field that changes the scene-linear result the Develop DAG
+/// receives: the decode key plus the apply-level operators that run before the
+/// tone stage (fill light and its tuning, detail, sharpness, highlight
+/// recovery/keep, overexposure handling). The DAG owns exposure, contrast,
+/// curves, colour and WB, so those are deliberately excluded — otherwise every
+/// exposure drag would force a multi-second re-decode.
+[[nodiscard]] auto FoveonLinearKey(const FoveonEditParams& params) -> std::uint64_t;
+
 /// Per-generation gate, exactly like Model.swift:664-670. Returns the value for
 /// x3f_render_set_oe_neutralize(): 8 for Quattro+mode8, 4 for Quattro off,
 /// 3 for Merrill/classic sky neutralisation, 4 otherwise.
@@ -204,6 +212,24 @@ struct FoveonGeometry {
   int orientation = 1;
 };
 
+/// Unclamped scene-linear RGB in **linear sRGB primaries**, RGB interleaved,
+/// sensor order. This is the only path-B product that may enter the Develop
+/// DAG: values below 0 and above 1 are real data (out-of-sRGB-gamut colours and
+/// highlight headroom) and must not be clamped, gamma-encoded or tagged as
+/// display-referred. Because the camera->sRGB matrix is already folded in, the
+/// DAG must be told the input primaries are sRGB (colour matrix = XYZ->sRGB),
+/// which composes back to camera->XYZ without loss.
+struct FoveonLinearImage {
+  std::shared_ptr<const float> rgb;
+  int                         width       = 0;
+  int                         height      = 0;
+  int                         orientation = 1;
+
+  [[nodiscard]] auto Empty() const -> bool {
+    return !rgb || width <= 0 || height <= 0;
+  }
+};
+
 /// RAII owner of one prepared (cached) linear frame. Copyable: the underlying
 /// C frame is refcounted, exactly like X3Lumina's linCache.
 class FoveonFrame {
@@ -228,6 +254,11 @@ class FoveonFrame {
   /// since Prepare(); call Prepare() again in that case.
   [[nodiscard]] auto Apply(const FoveonEditParams& params) const
       -> std::optional<FoveonImage>;
+
+  /// Scene-linear companion of Apply(): WB / fill light / detail / colour-mode
+  /// matrix, no tone curve, no clamp. Feeds the Develop DAG.
+  [[nodiscard]] auto ApplyLinear(const FoveonEditParams& params) const
+      -> std::optional<FoveonLinearImage>;
 
   [[nodiscard]] auto Geometry() const -> FoveonGeometry { return geometry_; }
   [[nodiscard]] auto DecodeKey() const -> std::uint64_t { return decode_key_; }
