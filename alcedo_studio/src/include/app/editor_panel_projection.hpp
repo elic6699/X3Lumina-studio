@@ -87,8 +87,11 @@ struct EditorPanelGradeWhiteBalanceValue {
 };
 
 struct EditorPanelRawDecodeValue {
-  std::string method                  = "default";
-  bool        highlights_reconstruct  = true;
+  std::string method                 = "default";
+  bool        highlights_reconstruct = true;
+  /// Sigma X3F only. Text, because it is a 64-bit digest and JSON numbers in
+  /// the UI layer are doubles.
+  std::string foveon_digest          = "0";
 };
 
 struct EditorPanelOdtValue {

@@ -75,6 +75,10 @@ auto DevelopParamsModel::HighlightsReconstruct() const -> bool {
   return Read([](const DevelopPayload& payload) { return payload.highlights_reconstruct; });
 }
 
+auto DevelopParamsModel::FoveonDigest() const -> std::uint64_t {
+  return Read([](const DevelopPayload& payload) { return payload.foveon_digest; });
+}
+
 auto DevelopParamsModel::UseCameraWhiteBalance() const -> bool {
   return Read([](const DevelopPayload& payload) { return payload.use_camera_wb; });
 }

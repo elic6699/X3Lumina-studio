@@ -127,14 +127,18 @@ Item {
         function onDecodeParamsChanged() { root.commitDecodeDigest(false) }
     }
 
+    // The Foveon operators live inside the decode, so the document has to be
+    // told they moved or nothing re-renders. Field key is "raw_decode": "raw"
+    // does not exist and submitPatch would reject the patch silently.
     function commitDecodeDigest(settled) {
         if (!root.foveon || !root.editorSession)
-            return
+            return false
         if (typeof root.editorSession.submitPatch !== "function")
-            return
-        root.editorSession.submitPatch("raw",
-                                       JSON.stringify({ foveon_digest: String(root.foveon.decodeDigest) }),
-                                       settled)
+            return false
+        return root.editorSession.submitPatch(
+                    "raw_decode",
+                    JSON.stringify({ foveon_digest: String(root.foveon.decodeDigest) }),
+                    settled)
     }
 
     ColumnLayout {
@@ -229,12 +233,18 @@ Item {
                 Button {
                     text: qsTr("Reset")
                     enabled: root.foveon && root.foveon.available
-                    onClicked: root.foveon.ResetParams()
+                    onClicked: {
+                        root.foveon.ResetParams()
+                        root.commitDecodeDigest(true)
+                    }
                 }
                 Button {
                     text: qsTr("Load sidecar")
                     enabled: root.foveon && root.foveon.available
-                    onClicked: root.foveon.LoadSidecar()
+                    onClicked: {
+                        root.foveon.LoadSidecar()
+                        root.commitDecodeDigest(true)
+                    }
                 }
                 Button {
                     text: qsTr("Save sidecar")

@@ -86,7 +86,10 @@ auto ApplyGraph(PipelineDocument& document, std::vector<GraphValidationError> er
 /// `as_shot_*`) that the RAW color context re-binds outside history.
 auto DevelopFieldOwnedKeys(std::string_view field_key) -> const std::vector<std::string_view>* {
   static const std::vector<std::string_view> kRawDecode{
-      "demosaic_method", "highlights_reconstruct", "use_camera_wb", "user_wb"};
+      "demosaic_method", "highlights_reconstruct", "use_camera_wb", "user_wb",
+      // Sigma X3F: the decode-level Foveon operators. Without it a slider move
+      // is filtered out of the history step and never reaches the document.
+      "foveon_digest"};
   static const std::vector<std::string_view> kColorTemp{"wb_mode", "custom_cct", "custom_tint"};
   static const std::vector<std::string_view> kLensCalib{
       "lens_enabled",   "apply_vignetting", "apply_distortion",   "apply_tca",

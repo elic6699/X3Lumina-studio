@@ -175,10 +175,35 @@ constexpr std::array kRawMethodOptions = {
 constexpr std::array kRawDecodeProperties = {
     EditorParameterProperty{"method", PropertyType::Option, kRawMethodOptions},
     EditorParameterProperty{"highlights_reconstruct", PropertyType::Boolean},
+    // Sigma X3F only: digest of the Foveon operators that run inside the decode.
+    // Carried as text because it is a 64-bit hash and JSON numbers are doubles.
+    EditorParameterProperty{"foveon_digest", PropertyType::String},
 };
 
 auto RawDecodeUiDefault() -> json {
-  return {{"method", "default"}, {"highlights_reconstruct", true}};
+  return {{"method", "default"}, {"highlights_reconstruct", true}, {"foveon_digest", "0"}};
+}
+
+/// The model stores the digest as an unsigned; the UI carries it as text.
+auto ReadDigestText(const json& raw, std::string* out) -> bool {
+  const auto it = raw.find("foveon_digest");
+  if (it == raw.end()) {
+    *out = "0";
+    return true;
+  }
+  if (it->is_string()) {
+    *out = it->get<std::string>();
+    return true;
+  }
+  if (it->is_number_unsigned()) {
+    *out = std::to_string(it->get<std::uint64_t>());
+    return true;
+  }
+  if (it->is_number_integer()) {
+    *out = std::to_string(it->get<std::int64_t>());
+    return true;
+  }
+  return false;
 }
 
 auto RawDecodeModelToUi(const json& model_json, std::string* error) -> std::optional<json> {
@@ -188,22 +213,35 @@ auto RawDecodeModelToUi(const json& model_json, std::string* error) -> std::opti
   }
   std::string method;
   bool        highlights = true;
+  std::string digest     = "0";
   if (!ReadString(raw, "method", "default", "raw_decode", &method, error) ||
-      !ReadBool(raw, "highlights_reconstruct", true, "raw_decode", &highlights, error)) {
+      !ReadBool(raw, "highlights_reconstruct", true, "raw_decode", &highlights, error) ||
+      !ReadDigestText(raw, &digest)) {
     return std::nullopt;
   }
-  return json{{"method", method}, {"highlights_reconstruct", highlights}};
+  return json{{"method", method},
+              {"highlights_reconstruct", highlights},
+              {"foveon_digest", digest}};
 }
 
 auto RawDecodeUiToModel(const json& ui_value) -> json {
   // The white balance and the backend keep the values of a new RAW Develop: the white balance
   // has its own field, and the decode backend is a pipeline setting, not an edit parameter.
-  return {{"raw",
-           {{"method", ui_value.at("method")},
-            {"highlights_reconstruct", ui_value.at("highlights_reconstruct")},
-            {"use_camera_wb", true},
-            {"user_wb", 7600.0},
-            {"backend", "alcedo"}}}};
+  json raw{{"method", ui_value.at("method")},
+           {"highlights_reconstruct", ui_value.at("highlights_reconstruct")},
+           {"use_camera_wb", true},
+           {"user_wb", 7600.0},
+           {"backend", "alcedo"}};
+  // Only X3F documents carry a digest; dropping it for every other body keeps
+  // their model JSON byte for byte what it was.
+  if (const auto it = ui_value.find("foveon_digest");
+      it != ui_value.end() && it->is_string() && it->get<std::string>() != "0") {
+    try {
+      raw["foveon_digest"] = std::stoull(it->get<std::string>());
+    } catch (const std::exception&) {
+    }
+  }
+  return {{"raw", std::move(raw)}};
 }
 
 // ---------------------------------------------------------------------------------------------

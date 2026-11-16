@@ -405,6 +405,7 @@ auto ReadRawDecode(const PipelineDocument& document, const EditorParameterTarget
   EditorPanelRawDecodeValue value;
   value.method                 = params->DemosaicMethod();
   value.highlights_reconstruct = params->HighlightsReconstruct();
+  value.foveon_digest          = std::to_string(params->FoveonDigest());
   return FinishField(target, std::move(value), out);
 }
 

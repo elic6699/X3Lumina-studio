@@ -339,6 +339,8 @@ class DevelopParamsModel final
    */
   [[nodiscard]] auto DemosaicMethod() const -> std::string;
   [[nodiscard]] auto HighlightsReconstruct() const -> bool;
+  /// Sigma X3F: digest of the decode-level Foveon operators (0 elsewhere).
+  [[nodiscard]] auto FoveonDigest() const -> std::uint64_t;
   [[nodiscard]] auto UseCameraWhiteBalance() const -> bool;
   [[nodiscard]] auto UserWhiteBalance() const -> float;
   [[nodiscard]] auto WhiteBalanceMode() const -> std::string;
