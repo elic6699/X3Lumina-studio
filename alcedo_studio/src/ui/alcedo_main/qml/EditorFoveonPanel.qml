@@ -321,14 +321,20 @@ Item {
                                                   ? root.values[modelData.key] : modelData.minimum)
                                     onMoved: if (root.foveon)
                                                  root.foveon.SetParam(modelData.key, value)
-                                    onReleased: root.commitDecodeDigest(true)
+                                    // QQC2 Slider has no released() signal; the
+                                    // press ending is the "settled" edge that
+                                    // closes the history step.
+                                    onPressedChanged: if (!pressed)
+                                                          root.commitDecodeDigest(true)
                                 }
                                 CheckBox {
                                     visible: modelData.kind === "toggle"
                                     checked: Number(root.values[modelData.key] || 0) >= 0.5
-                                    onToggled: if (root.foveon)
-                                                   root.foveon.SetParam(modelData.key,
-                                                                        checked ? 1 : 0)
+                                    onToggled: {
+                                        if (root.foveon)
+                                            root.foveon.SetParam(modelData.key, checked ? 1 : 0)
+                                        root.commitDecodeDigest(true)
+                                    }
                                 }
                                 ComboBox {
                                     visible: modelData.kind === "combo"
@@ -336,8 +342,11 @@ Item {
                                     model: modelData.options
                                     currentIndex: Math.max(0, modelData.options.indexOf(
                                                                String(root.values[modelData.key] || "")))
-                                    onActivated: if (root.foveon)
-                                                     root.foveon.SetParam(modelData.key, currentText)
+                                    onActivated: {
+                                        if (root.foveon)
+                                            root.foveon.SetParam(modelData.key, currentText)
+                                        root.commitDecodeDigest(true)
+                                    }
                                 }
                             }
                         }
