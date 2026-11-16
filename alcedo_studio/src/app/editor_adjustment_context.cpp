@@ -245,7 +245,13 @@ auto AdjustmentFieldIsSupported(EditorNodeKind kind, std::string_view field_key)
 
 auto PanelWriteOwnerNode(const PipelineDocument& document, const NodeId& selected_node_id,
                          std::string_view field_key) -> NodeId {
-  if (field_key == "crop_rotate") {
+  // Every Develop field belongs to the Develop node whatever is selected in the
+  // graph: the RAW decode, lens calibration, white balance and input profile are
+  // document-level RAW settings, and the panel that writes them never asks the
+  // user to select a node first. Routing them through the selection made the
+  // write fail with "not owned by the selected node" as soon as a Grade or DRT
+  // node happened to be selected.
+  if (IsDevelopField(field_key)) {
     if (const auto* develop = document.Develop(); develop != nullptr) {
       return develop->Id();
     }

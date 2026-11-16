@@ -116,15 +116,26 @@ Item {
                         root.foveon.ExportFoveon16(selectedFile)
     }
 
-    Connections {
-        target: root.foveon
-        function onParametersChanged() { root.refreshValues() }
-        function onSourceChanged() { root.refreshSpecs() }
-        function onDecoderChanged() { root.refreshSpecs() }
-        // These operators live in the decode, so a change is a document change:
-        // echo the new digest through the RAW Decode node to re-render, enter
-        // history and move the result key. settled=false while a slider drags.
-        function onDecodeParamsChanged() { root.commitDecodeDigest(false) }
+    // The controller is a context object that only exists once the editor UI is
+    // up, so a plain Connections created with the panel binds a null target and
+    // Qt then reports "no signal of the target matches the name" for every
+    // handler — silently: values, body gating and the digest commit all stop
+    // following the controller. Creating it through a Loader guarantees the
+    // target is real when the connections are made.
+    onFoveonChanged: root.refreshSpecs()
+
+    Loader {
+        active: root.foveon !== null && root.foveon !== undefined
+        sourceComponent: Connections {
+            target: root.foveon
+            function onParametersChanged() { root.refreshValues() }
+            function onSourceChanged() { root.refreshSpecs() }
+            function onDecoderChanged() { root.refreshSpecs() }
+            // A decode-level operator is a document change: echo the new digest
+            // through the RAW Decode node so the frame re-renders, enters
+            // history and moves the result key.
+            function onDecodeParamsChanged() { root.commitDecodeDigest(false) }
+        }
     }
 
     // The Foveon operators live inside the decode, so the document has to be
@@ -331,6 +342,9 @@ Item {
                                                   ? root.values[modelData.key] : modelData.minimum)
                                     onMoved: if (root.foveon)
                                                  root.foveon.SetParam(modelData.key, value)
+                                    // QQC2 Slider has no released() signal; the
+                                    // press ending is the "settled" edge that
+                                    // closes the history step.
                                     // QQC2 Slider has no released() signal; the
                                     // press ending is the "settled" edge that
                                     // closes the history step.
