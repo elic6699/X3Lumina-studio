@@ -8,6 +8,7 @@
 #include <x3f_alcedo_foveon.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <charconv>
 #include <cmath>
@@ -399,6 +400,14 @@ auto FoveonLinearKey(const FoveonEditParams& params) -> std::uint64_t {
   h = MixBits(h, params.detail);
   h = MixBits(h, params.sharpness);
   h = MixBits(h, params.sharp_res);
+  // Noise reduction runs in the linear domain, before the deferred tone stage,
+  // so it changes the pixels the DAG receives. Leaving it out of the digest
+  // made the result cache serve the previous NR level — the slider looked dead
+  // whenever the prepared plane was still resident (and worked after a big
+  // enough edit evicted it), which is the worst kind of intermittent.
+  h = MixBits(h, params.nr_luma);
+  h = MixBits(h, params.nr_chroma);
+  h = MixBits(h, params.nr_banding);
   h = MixBits(h, params.hl_recover);
   h = MixBits(h, params.hl_keep);
   h = MixBits(h, params.hl_chroma);
@@ -589,6 +598,35 @@ auto FoveonRenderer::Render(std::span<const std::byte> encoded,
     source_id_ = id;
   }
   auto image = frame_->Apply(params);
+  if (!image) {
+    error_ = FoveonLastError();
+    frame_.reset();
+    return std::nullopt;
+  }
+  error_.clear();
+  return image;
+}
+
+auto FoveonRenderer::RenderLinear(std::span<const std::byte> encoded,
+                                  const FoveonEditParams& params)
+    -> std::optional<FoveonLinearImage> {
+  const std::lock_guard lock(mutex_);
+  const std::string id =
+      "mem:" + std::to_string(encoded.size()) + ":" +
+      std::to_string(Fnv1a(encoded));
+  const auto key = FoveonDecodeKey(params);
+  if (!frame_ || !frame_->Valid() || source_id_ != id ||
+      frame_->DecodeKey() != key) {
+    auto prepared = FoveonFrame::Prepare(encoded, params);
+    if (!prepared) {
+      error_ = FoveonLastError();
+      frame_.reset();
+      return std::nullopt;
+    }
+    frame_     = std::move(prepared);
+    source_id_ = id;
+  }
+  auto image = frame_->ApplyLinear(params);
   if (!image) {
     error_ = FoveonLastError();
     frame_.reset();
@@ -809,6 +847,82 @@ auto ActiveFoveonParams(std::uint64_t content_hash)
 auto ActiveFoveonVariant(std::uint64_t content_hash) -> std::uint64_t {
   const auto params = ActiveFoveonParams(content_hash);
   return params ? FoveonLinearKey(*params) : 0;
+}
+
+// ── Prepared-frame cache for the Develop feed ──────────────────────────────
+//
+// The instance method already caches one frame, but the feed is keyed by file
+// and the editor holds one document at a time while the library grid may ask
+// for another. Two slots (LRU) keep the common edit loop free of decodes
+// without holding a second full-resolution plane for every image visited.
+namespace {
+
+constexpr std::size_t kLinearFeedSlots = 2;
+
+struct LinearFeedSlot {
+  std::uint64_t                   hash = 0;
+  std::shared_ptr<FoveonRenderer> renderer;
+  std::uint64_t                   stamp = 0;
+};
+
+struct LinearFeed {
+  std::mutex                                  mutex;
+  std::array<LinearFeedSlot, kLinearFeedSlots> slots{};
+  std::uint64_t                               clock = 0;
+};
+
+auto FeedStore() -> LinearFeed& {
+  static LinearFeed store;
+  return store;
+}
+
+}  // namespace
+
+auto FoveonLinearFeed(std::span<const std::byte> encoded,
+                      const FoveonEditParams& params)
+    -> std::optional<FoveonLinearImage> {
+  if (encoded.empty()) {
+    return std::nullopt;
+  }
+  const auto hash = Fnv1a(encoded);
+  std::shared_ptr<FoveonRenderer> renderer;
+  {
+    auto&               store = FeedStore();
+    const std::lock_guard lock(store.mutex);
+    LinearFeedSlot* walk = nullptr;
+    for (auto& slot : store.slots) {
+      if (slot.renderer && slot.hash == hash) {
+        slot.stamp = ++store.clock;
+        walk       = &slot;
+        break;
+      }
+    }
+    if (walk == nullptr) {
+      // Reuse the least recently used slot; the old renderer is destroyed when
+      // the last reference goes, which also drops its staged temp file.
+      walk = &store.slots[0];
+      for (auto& slot : store.slots) {
+        if (!slot.renderer || slot.stamp < walk->stamp) {
+          walk = &slot;
+        }
+      }
+      walk->hash     = hash;
+      walk->renderer = std::make_shared<FoveonRenderer>();
+      walk->stamp    = ++store.clock;
+    }
+    renderer = walk->renderer;
+  }
+  return renderer->RenderLinear(encoded, params);
+}
+
+void FoveonLinearFeedFlush() {
+  auto&                   store = FeedStore();
+  const std::lock_guard   lock(store.mutex);
+  for (auto& slot : store.slots) {
+    slot.renderer.reset();
+    slot.hash  = 0;
+    slot.stamp = 0;
+  }
 }
 
 }  // namespace alcedo::x3f

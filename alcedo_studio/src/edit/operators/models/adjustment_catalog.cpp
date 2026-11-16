@@ -37,6 +37,7 @@ BuiltinAdjustmentCatalog::BuiltinAdjustmentCatalog() {
   Register({type_ids::White(), "White", MakeFactory<WhiteModel>()});
   Register({type_ids::Black(), "Black", MakeFactory<BlackModel>()});
   Register({type_ids::Shadows(), "Shadows", MakeFactory<ShadowsModel>()});
+  Register({type_ids::FillLight(), "Fill Light", MakeFactory<FillLightModel>()});
   Register({type_ids::Highlights(), "Highlights", MakeFactory<HighlightsModel>()});
   Register({type_ids::Curve(), "Curve", MakeFactory<CurveModel>()});
   Register({type_ids::Hls(), "HLS", MakeFactory<HlsModel>()});

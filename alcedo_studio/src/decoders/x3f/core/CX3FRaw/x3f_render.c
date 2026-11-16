@@ -14403,6 +14403,91 @@ static void apply_hf_soften(void *vout, int w, int h, int stride, int bits)
     free(jb.Y); free(jb.tmp); free(jb.blur);
 }
 
+static int sdq_cmp_f(const void *a, const void *b)
+{
+    const float x = *(const float *)a, y = *(const float *)b;
+    return (x < y) ? -1 : (x > y);
+}
+
+/* 线性域的「SDQ 高光收色」。
+ *
+ * 显示域那条（sdq_weight_at）的判据是显示亮度 + 色差，而 look_defer 的出口
+ * 还没有曲线，拿不到显示值 —— 于是 SDQ 滑杆在线性馈送（Develop DAG）里完全
+ * 无效。这里的做法是把同样的判据搬到线性的**相对**亮度上：
+ *
+ *   white = 线性 Y 的 99.5 分位（画面白点，随机采样估计）
+ *   yy    = Y / white          —— 与显示域 Y 单调对应的 0..1 量
+ *   权重  = sstep01(0.29, 0.67, yy) × 色差排除
+ *
+ * 0.29 / 0.67 就是显示域 0.58 / 0.84 换回线性的值。用相对白点而不是绝对
+ * 线性值，是因为 DAG 的曝光和曲线在解码之后才知道：显示域的 0.58 对应哪个
+ * 线性值取决于下游怎么拉。归一化之后判据与曝光无关。
+ *
+ * 再与 RAW 逐通道饱和分（clip，0..3）取并集：cs ≥ 2.4 三通道全饱和 ⇒ 这
+ * 就是白，这是 X3Lumina 里 sdq_scene_judge 的第二项，补“引擎把高光压到
+ * Y 0.7 后显示判据够不到”的那块。
+ *
+ * 两者都排除浓彩色（相对色差 0.40 起渐出、0.55 排除），否则橙色反光会被收
+ * 成灰。只对 SDQ/SDQH 生效（DigitalISOGain != 1）；滑杆 0 时整块不进
+ * ⇒ 未拖动逐位零回归。 */
+static void sdq_linear_desat(float *out, const float *clip, int w, int h,
+                             int stride, double strength)
+{
+    const size_t npix = (size_t)w * (size_t)h;
+    size_t       step, n = 0, i;
+    float       *samples;
+    double       white;
+    int          y;
+
+    if (out == NULL || npix == 0 || strength <= 0.0) return;
+    if (strength > 1.0) strength = 1.0;
+
+    step = npix / 20000u;
+    if (step < 1u) step = 1u;
+    samples = (float *)malloc((npix / step + 2u) * sizeof(float));
+    if (samples == NULL) return;
+    for (i = 0; i < npix; i += step) {
+        const float *px = (float *)((char *)out +
+                                    (size_t)(i / (size_t)w) * (size_t)stride) +
+                          (i % (size_t)w) * 3;
+        samples[n++] = (float)(0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]);
+    }
+    if (n == 0) { free(samples); return; }
+    qsort(samples, n, sizeof(float), sdq_cmp_f);
+    white = samples[(size_t)((double)(n - 1) * 0.995)];
+    free(samples);
+    if (!(white > 1e-4)) white = 1e-4;
+
+    for (y = 0; y < h; y++) {
+        float *d = (float *)((char *)out + (size_t)y * (size_t)stride);
+        const float *c = clip ? clip + (size_t)y * (size_t)w : NULL;
+        int x;
+        for (x = 0; x < w; x++) {
+            const double cs = c ? c[x] : 0.0;
+            double ww, w_disp, w_clip, yv, yy, mx, mn, rel;
+            float *px;
+            int k;
+            px = d + (size_t)x * 3;
+            mx = mn = px[0];
+            for (k = 1; k < 3; k++) {
+                if (px[k] > mx) mx = px[k];
+                if (px[k] < mn) mn = px[k];
+            }
+            rel = (mx > 1e-6) ? (mx - mn) / mx : 0.0;
+            if (rel >= 0.55) continue;
+            yv     = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
+            yy     = yv / white;
+            w_disp = sstep01(0.29, 0.67, yy);
+            w_clip = sstep01(1.0, 2.4, cs);
+            if (w_clip > w_disp) w_disp = w_clip;
+            ww = w_disp * (1.0 - sstep01(0.40, 0.55, rel)) * strength;
+            if (ww <= 0.0) continue;
+            for (k = 0; k < 3; k++)
+                px[k] = (float)(yv + (px[k] - yv) * (1.0 - ww));
+        }
+    }
+}
+
 static int apply_ex_common(const x3f_edit_params_t *p,
                            const float *lin, const float *clip,
                            int w, int h, void *out, int stride, int bits)
@@ -15492,7 +15577,14 @@ static int apply_ex_common(const x3f_edit_params_t *p,
     }
 
     /* 观感延后：到这里 out 已经是线性 sRGB 码值，显示域后处理一律不做。 */
-    if (look_defer) return X3FRENDER_OK;
+    if (look_defer) {
+        /* SDQ 高光在线性馈送里没有显示域可用，改用 RAW 饱和分掩膜收色
+         * （见 sdq_linear_desat）。只在 32 位 float 出口做，16 位那条
+         * look_defer 出口维持原样。 */
+        if (bits == 32 && g_sdq_hl > 0.0 && sdq_dig_active())
+            sdq_linear_desat((float *)out, clip, w, h, stride, g_sdq_hl);
+        return X3FRENDER_OK;
+    }
 
     /* 空间类放在最后：在显示空间上做，符合视觉感受 */
     {

@@ -22,6 +22,7 @@ enum class EditorAdjustmentField {
   Whites,
   Blacks,
   Shadows,
+  FillLight,
   Highlights,
   Curve,
   Saturation,

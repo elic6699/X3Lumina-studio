@@ -209,6 +209,11 @@ auto ReadShadows(const PipelineDocument& document, const EditorParameterTarget& 
   return ReadGradeScalar<ShadowsModel>(document, target, "shadows", out, error);
 }
 
+auto ReadFillLight(const PipelineDocument& document, const EditorParameterTarget& target,
+                   EditorPanelFieldPresentation* out, std::string* error) -> bool {
+  return ReadGradeScalar<FillLightModel>(document, target, "fill_light", out, error);
+}
+
 auto ReadHighlights(const PipelineDocument& document, const EditorParameterTarget& target,
                     EditorPanelFieldPresentation* out, std::string* error) -> bool {
   return ReadGradeScalar<HighlightsModel>(document, target, "highlights", out, error);
@@ -542,6 +547,7 @@ auto EditorPanelAdapterTable::Production() -> EditorPanelAdapterTable {
     table.Add({"white", "tone", &ReadWhite, true});
     table.Add({"black", "tone", &ReadBlack, true});
     table.Add({"shadows", "tone", &ReadShadows, true});
+    table.Add({"fill_light", "tone", &ReadFillLight, true});
     table.Add({"highlights", "tone", &ReadHighlights, true});
     table.Add({"curve", "tone", &ReadCurve, true});
     table.Add({"saturation", "look", &ReadSaturation, true});

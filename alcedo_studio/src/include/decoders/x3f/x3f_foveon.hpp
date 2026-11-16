@@ -298,6 +298,15 @@ class FoveonRenderer {
                             const FoveonEditParams& params)
       -> std::optional<FoveonImage>;
 
+  /// Scene-linear companion of Render(encoded): same prepared-frame cache, but
+  /// the deferred-tone product the Develop DAG consumes. Fill light, detail,
+  /// sharpening, highlight handling and NR are APPLY-level, so changing one
+  /// re-runs the apply pass on the cached frame instead of decoding again —
+  /// which is what X3Lumina's linCache does and why its fill light is instant.
+  [[nodiscard]] auto RenderLinear(std::span<const std::byte> encoded,
+                                  const FoveonEditParams& params)
+      -> std::optional<FoveonLinearImage>;
+
   /// Merrill SPP native chain with its six tone-stage controls. The expensive
   /// prepare() (decode + float front end + noise reduction) is cached; tone
   /// changes only re-run the ~30 ms tonal stage. nr_luma is a prepare-level
@@ -330,6 +339,19 @@ class FoveonRenderer {
 [[nodiscard]] auto RenderFoveonOnce(const std::filesystem::path& path,
                                     const FoveonEditParams& params)
     -> std::optional<FoveonImage>;
+
+/// Scene-linear feed for the Develop DAG, with the decoded frame kept between
+/// calls. A slider that only touches APPLY-level operators (fill light, detail,
+/// sharpness, highlight recovery, NR, SDQ highlight) re-runs the apply pass; a
+/// DECODE-level switch (overexposure / hole fix / HLP / WB preset / NLM / LOD)
+/// prepares a new frame. Keyed by the encoded bytes, so switching images costs
+/// one decode and coming back is free (two slots, LRU).
+[[nodiscard]] auto FoveonLinearFeed(std::span<const std::byte> encoded,
+                                    const FoveonEditParams& params)
+    -> std::optional<FoveonLinearImage>;
+
+/// Drop the cached frames (export finished, session closed, memory pressure).
+void FoveonLinearFeedFlush();
 
 /// Merrill "原链解码" (SPP native chain) straight-out output. X3Lumina's
 /// MerrillDecodeBackend.sppPipeline: the SPP chain produces a FINISHED 16-bit

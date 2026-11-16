@@ -35,6 +35,7 @@ Item {
         shadowsModel.enabled = on
         whitesModel.enabled = on
         blacksModel.enabled = on
+        fillLightModel.enabled = on
         curveModel.enabled = on
     }
 
@@ -47,6 +48,7 @@ Item {
         shadowsModel.value = shadowsModel.defaultValue
         whitesModel.value = whitesModel.defaultValue
         blacksModel.value = blacksModel.defaultValue
+        fillLightModel.value = fillLightModel.defaultValue
         wireEnabled()
         // Bootstrap when the stack has not yet projected (tests / late session).
         // Equal values no-op if the stack already applied the same snapshot.
@@ -117,6 +119,17 @@ Item {
         label: qsTr("Blacks")
         submitter: root.editorSession
     }
+    // Fill light lives here now, under Blacks, for every document: it is a
+    // LocalTone shadow lift inside the Grade, not a Foveon decode operator, so
+    // JPEG / TIFF / Bayer RAW all get it. The value keeps the SPP units
+    // (-2..+2, 0.1 steps).
+    EditorAdjustmentValueModel {
+        id: fillLightModel
+        objectName: "toneFillLightModel"
+        fieldKey: "fill_light"
+        label: qsTr("Fill Light")
+        submitter: root.editorSession
+    }
     EditorToneCurveModel {
         id: curveModel
         objectName: "toneCurveModel"
@@ -142,7 +155,7 @@ Item {
 
     readonly property var toneModels: [
         exposureModel, contrastModel, highlightsModel,
-        shadowsModel, whitesModel, blacksModel
+        shadowsModel, whitesModel, blacksModel, fillLightModel
     ]
 
     Flickable {
@@ -260,6 +273,12 @@ Item {
                         objectName: "toneBlacksSlider"
                         Layout.fillWidth: true
                         model: blacksModel
+                        flickable: toneScroll
+                    }
+                    AdjustmentSlider {
+                        objectName: "toneFillLightSlider"
+                        Layout.fillWidth: true
+                        model: fillLightModel
                         flickable: toneScroll
                     }
                 }

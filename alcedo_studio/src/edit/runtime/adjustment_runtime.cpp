@@ -79,6 +79,7 @@ auto TryResolveAdjustmentBehavior(const OperatorTypeId& type) -> std::optional<A
   if (type == type_ids::White()) return White;
   if (type == type_ids::Black()) return Black;
   if (type == type_ids::Shadows()) return Shadows;
+  if (type == type_ids::FillLight()) return FillLight;
   if (type == type_ids::Highlights()) return Highlights;
   if (type == type_ids::Curve()) return Curve;
   if (type == type_ids::Hls()) return Hls;
@@ -102,7 +103,10 @@ auto ResolveAdjustmentBehavior(const OperatorTypeId& type) -> AdjustmentBehavior
 }
 
 auto IsLocalToneBehavior(AdjustmentBehavior behavior) -> bool {
-  return behavior == AdjustmentBehavior::Shadows || behavior == AdjustmentBehavior::Highlights;
+  // Fill light is the third LLF consumer: the schedule folds it into the shadow
+  // lift, so it must travel in the LocalLaplacian stage like Shadows/Highlights.
+  return behavior == AdjustmentBehavior::Shadows || behavior == AdjustmentBehavior::Highlights ||
+         behavior == AdjustmentBehavior::FillLight;
 }
 
 auto IsNeighborhoodBehavior(AdjustmentBehavior behavior) -> bool {
@@ -154,6 +158,9 @@ auto MakeGradeRuntimeParams(const IOperatorModel& model, AdjustmentBehavior beha
       return result;
     case AdjustmentBehavior::Shadows:
       PackScalarValue<ShadowsModel>(model, result);
+      return result;
+    case AdjustmentBehavior::FillLight:
+      PackScalarValue<FillLightModel>(model, result);
       return result;
     case AdjustmentBehavior::Highlights:
       PackScalarValue<HighlightsModel>(model, result);

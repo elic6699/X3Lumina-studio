@@ -14,14 +14,17 @@
 //   * path A stays a separate, unclamped scene-linear wide-gamut source.
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -375,6 +378,60 @@ auto main(int argc, char** argv) -> int {
     if (lo > 0.0F && hi <= 1.0F) {
       std::cerr << "NOTE: this sample has no out-of-sRGB values; "
                    "wide-gamut smoke needs a saturated sample\n";
+    }
+  }
+
+  // Develop feed cache: fill light / detail / NR are APPLY-level, so moving one
+  // must re-run the apply pass on the cached frame, not decode the mosaic again.
+  // This is what makes the panel feel instant (X3Lumina's linCache does the
+  // same); if the second call costs as much as the first, the frame is being
+  // thrown away between calls.
+  {
+    std::ifstream in(path, std::ios::binary);
+    std::vector<char> raw((std::istreambuf_iterator<char>(in)),
+                          std::istreambuf_iterator<char>());
+    if (raw.empty()) {
+      std::cerr << "FAIL: cannot read the file for the feed test\n";
+      return 1;
+    }
+    std::vector<std::byte> bytes(raw.size());
+    std::memcpy(bytes.data(), raw.data(), raw.size());
+
+    auto p_fill     = params;
+    p_fill.fill_light = 0.6;
+
+    const auto t0 = std::chrono::steady_clock::now();
+    const auto feed0 = alcedo::x3f::FoveonLinearFeed(bytes, params);
+    const auto t1 = std::chrono::steady_clock::now();
+    const auto feed1 = alcedo::x3f::FoveonLinearFeed(bytes, p_fill);
+    const auto t2 = std::chrono::steady_clock::now();
+    if (!feed0 || feed0->Empty() || !feed1 || feed1->Empty()) {
+      std::cerr << "FAIL: FoveonLinearFeed: " << alcedo::x3f::FoveonLastError()
+                << "\n";
+      return 1;
+    }
+    const auto ms = [](auto a, auto b) {
+      return std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+    };
+    const auto cold_ms = ms(t0, t1);
+    const auto warm_ms = ms(t1, t2);
+    std::cout << "feed cache: decode+apply=" << cold_ms
+              << "ms fill-only=" << warm_ms << "ms\n";
+    if (cold_ms > 150 && warm_ms >= cold_ms) {
+      std::cerr << "FAIL: a fill-light change cost as much as a fresh decode "
+                   "(prepared frame not reused)\n";
+      return 1;
+    }
+
+    bool differs = false;
+    const std::size_t fn = static_cast<std::size_t>(feed0->width) *
+                           static_cast<std::size_t>(feed0->height) * 3U;
+    for (std::size_t i = 0; i < fn && !differs; ++i) {
+      differs = feed0->rgb.get()[i] != feed1->rgb.get()[i];
+    }
+    if (!differs) {
+      std::cerr << "FAIL: fill light did not change the linear feed\n";
+      return 1;
     }
   }
 

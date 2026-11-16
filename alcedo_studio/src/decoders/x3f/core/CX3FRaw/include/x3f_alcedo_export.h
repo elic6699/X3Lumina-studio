@@ -82,8 +82,9 @@ int x3f_alcedo_model_class(const char *path);
  * （2026-11-16 用户实测报障）。面板置灰与 oe 解析一律用本函数。 */
 int x3f_alcedo_model_gen(const char *path);
 
-/* 本文件是否 SD Quattro / SD Quattro H 机身（RAW type_format SDQ / SDQH）——
- * 「SDQ 高光」滑杆的**门控**口径：X3Lumina 在两种 SDQ 机身上都摆滑杆。 */
+/* 本文件是否 SD Quattro **H**（RAW type_format SDQH，DigitalISOGain (4,4,2)）——
+ * 「SDQ 高光」滑杆的**门控**口径。SD Quattro 的增益是 (1,1,1)，同一个滑杆
+ * 在上面乘 1.0，什么都不做，所以整条滑块不在该机型出现（2026-11-16 用户定）。 */
 int x3f_alcedo_sdq_hl_capable(const char *path);
 
 /* 该文件的 DigitalISOGain 是否偏离 (1,1,1)——归一在该机身上是否**真的**

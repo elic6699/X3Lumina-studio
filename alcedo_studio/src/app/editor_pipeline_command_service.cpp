@@ -70,6 +70,7 @@ auto OperatorTypeForCurrentPanelField(std::string_view field) -> const OperatorT
   if (field == "white" || field == "whites") return &type_ids::White();
   if (field == "black" || field == "blacks") return &type_ids::Black();
   if (field == "shadows") return &type_ids::Shadows();
+  if (field == "fill_light") return &type_ids::FillLight();
   if (field == "highlights") return &type_ids::Highlights();
   if (field == "curve") return &type_ids::Curve();
   if (field == "saturation") return &type_ids::Saturation();

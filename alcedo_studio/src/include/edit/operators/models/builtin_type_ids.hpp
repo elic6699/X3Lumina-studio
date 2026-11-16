@@ -28,6 +28,13 @@ inline auto Shadows() -> const OperatorTypeId& {
   static const OperatorTypeId id{"alcedo.adjustment.shadows"};
   return id;
 }
+/// Fill light: lifts shadow detail from a local luminance map and leaves the
+/// highlights alone. LocalTone owns the mapping (it is the same LLF that serves
+/// Shadows/Highlights), so this works on every input, not just X3F.
+inline auto FillLight() -> const OperatorTypeId& {
+  static const OperatorTypeId id{"alcedo.adjustment.fill_light"};
+  return id;
+}
 inline auto Highlights() -> const OperatorTypeId& {
   static const OperatorTypeId id{"alcedo.adjustment.highlights"};
   return id;

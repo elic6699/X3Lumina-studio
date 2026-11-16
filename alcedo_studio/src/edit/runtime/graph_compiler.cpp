@@ -101,7 +101,11 @@ auto MixText(std::uint64_t hash, std::string_view text) -> std::uint64_t {
 }
 
 auto CompileAdjustmentAlgorithm(const OperatorTypeId& type) -> CompiledAdjustmentAlgorithm {
-  if (type == type_ids::Shadows() || type == type_ids::Highlights()) {
+  // Fill light rides the LocalTone pyramid: it is a shadow lift measured against
+  // a local luminance map, which is why it works on every input instead of only
+  // on the Foveon decode.
+  if (type == type_ids::Shadows() || type == type_ids::Highlights() ||
+      type == type_ids::FillLight()) {
     return CompiledAdjustmentAlgorithm::LocalLaplacian;
   }
   if (type == type_ids::Clarity() || type == type_ids::Sharpen() || type == type_ids::Halation() ||

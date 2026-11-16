@@ -118,8 +118,17 @@ auto LoadX3fEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)
   const auto published = ActiveFoveonParams(hash);
   auto       params    = published.value_or(FoveonEditParams{});
   params.down = std::max(1, NativeDown(decode_res));
-  const auto frame = FoveonFrame::Prepare(encoded, params);
-  const auto lin   = frame ? frame->ApplyLinear(params) : std::nullopt;
+  // Fill light moved to the Develop DAG (one Tone slider for every document, not
+  // just X3F): the LocalTone stage applies it after decoding. Leaving the decode
+  // copy on would apply it twice. Its calibration knobs stay in the panel but are
+  // inert while this is zero, which is what "moved" means.
+  params.fill_light = 0.0;
+  // The frame itself is kept between calls: fill light, detail, sharpening,
+  // highlight recovery, NR and SDQ highlight are all apply-level operators, so
+  // dragging one re-runs the apply pass instead of decoding the mosaic again
+  // (X3Lumina's linCache behaves the same way and that is why its fill light is
+  // instant). Only a decode-level switch prepares a new frame.
+  const auto lin = FoveonLinearFeed(encoded, params);
   if (!lin || lin->Empty()) {
     throw std::runtime_error(std::string("X3fInputLoader: Foveon native "
                                          "decode failed: ") +

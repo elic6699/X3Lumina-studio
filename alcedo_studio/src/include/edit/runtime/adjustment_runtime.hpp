@@ -34,6 +34,9 @@ enum class AdjustmentBehavior : std::uint32_t {
   Sharpen,
   Halation,
   FilmGrain,
+  /// Appended so the existing behavior ids keep their values: this enum is
+  /// mirrored into GradeAdjustmentParams::behavior and read by the shaders.
+  FillLight,
 };
 
 struct alignas(16) GradeAdjustmentParams {

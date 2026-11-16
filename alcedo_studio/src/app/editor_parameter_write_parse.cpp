@@ -1012,6 +1012,9 @@ auto ParseWriteOrThrow(std::string_view field, const nlohmann::json& params, Par
   if (field == "shadows") {
     return ParseScalarWrite(params, field, "shadows");
   }
+  if (field == "fill_light") {
+    return ParseScalarWrite(params, field, "fill_light");
+  }
   if (field == "highlights") {
     return ParseScalarWrite(params, field, "highlights");
   }

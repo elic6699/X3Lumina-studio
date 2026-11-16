@@ -14,7 +14,7 @@ namespace alcedo {
 namespace {
 
 // Every accepted field key, including the aliases that panels and older history rows use.
-constexpr std::array<std::pair<std::string_view, EditorAdjustmentField>, 30> kFieldKeys = {{
+constexpr std::array<std::pair<std::string_view, EditorAdjustmentField>, 31> kFieldKeys = {{
     {"exposure", EditorAdjustmentField::Exposure},
     {"contrast", EditorAdjustmentField::Contrast},
     {"white", EditorAdjustmentField::Whites},
@@ -22,6 +22,7 @@ constexpr std::array<std::pair<std::string_view, EditorAdjustmentField>, 30> kFi
     {"black", EditorAdjustmentField::Blacks},
     {"blacks", EditorAdjustmentField::Blacks},
     {"shadows", EditorAdjustmentField::Shadows},
+    {"fill_light", EditorAdjustmentField::FillLight},
     {"highlights", EditorAdjustmentField::Highlights},
     {"curve", EditorAdjustmentField::Curve},
     {"saturation", EditorAdjustmentField::Saturation},

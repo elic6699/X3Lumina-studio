@@ -60,7 +60,8 @@ auto IsDevelopField(std::string_view field) -> bool {
 
 auto IsColorGradeField(std::string_view field) -> bool {
   return field == "exposure" || field == "contrast" || field == "white" || field == "whites" ||
-         field == "black" || field == "blacks" || field == "shadows" || field == "highlights" ||
+         field == "black" || field == "blacks" || field == "shadows" || field == "fill_light" ||
+         field == "highlights" ||
          field == "curve" || field == "saturation" || field == "vibrance" ||
          field == "grade_white_balance" || field == "hls" || field == "HLS" ||
          field == "color_wheel" || field == "lut" || field == "ocio_lmt";
@@ -72,6 +73,7 @@ auto OperatorTypeForField(std::string_view field) -> const OperatorTypeId* {
   if (field == "white" || field == "whites") return &type_ids::White();
   if (field == "black" || field == "blacks") return &type_ids::Black();
   if (field == "shadows") return &type_ids::Shadows();
+  if (field == "fill_light") return &type_ids::FillLight();
   if (field == "highlights") return &type_ids::Highlights();
   if (field == "curve") return &type_ids::Curve();
   if (field == "saturation") return &type_ids::Saturation();

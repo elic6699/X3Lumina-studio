@@ -119,6 +119,21 @@ struct BlackTraits {
   static constexpr float            kMax            = 100.0f;
 };
 
+/// Fill light. Same units as X3Lumina's and SPP's slider (-2..+2, 0.1 steps) so a
+/// sidecar value means the same thing on both sides. The Grade schedule folds it
+/// into the LLF shadow lift and a light highlight recovery.
+struct FillLightTraits {
+  using Payload = ScalarFloatPayload;
+  enum class Dirty : std::uint32_t { None = 0, Value = 1U << 0, All = Value };
+  static auto TypeId() -> const OperatorTypeId& { return type_ids::FillLight(); }
+  static constexpr std::string_view kJsonKey        = "fill_light";
+  static constexpr std::string_view kDisplayName    = "Fill Light";
+  static constexpr std::string_view kInstanceSuffix = "fill_light";
+  static constexpr float            kDefault        = 0.0f;
+  static constexpr float            kMin            = -2.0f;
+  static constexpr float            kMax            = 2.0f;
+};
+
 struct ShadowsTraits {
   using Payload = ScalarFloatPayload;
   enum class Dirty : std::uint32_t { None = 0, Value = 1U << 0, All = Value };
@@ -224,6 +239,7 @@ using ContrastModel   = ScalarOperatorModel<ContrastTraits>;
 using WhiteModel      = ScalarOperatorModel<WhiteTraits>;
 using BlackModel      = ScalarOperatorModel<BlackTraits>;
 using ShadowsModel    = ScalarOperatorModel<ShadowsTraits>;
+using FillLightModel  = ScalarOperatorModel<FillLightTraits>;
 using HighlightsModel = ScalarOperatorModel<HighlightsTraits>;
 using SaturationModel = ScalarOperatorModel<SaturationTraits>;
 using VibranceModel   = ScalarOperatorModel<VibranceTraits>;

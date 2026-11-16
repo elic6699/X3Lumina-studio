@@ -99,6 +99,11 @@ void ApplyColorGradeWrite(IOperatorModel& model, std::string_view field,
     ApplyScalarValue<ShadowsModel>(model, field, RequireWrite<EditorScalarWrite>(write, field).value);
     return;
   }
+  if (field == "fill_light") {
+    ApplyScalarValue<FillLightModel>(model, field,
+                                     RequireWrite<EditorScalarWrite>(write, field).value);
+    return;
+  }
   if (field == "highlights") {
     ApplyScalarValue<HighlightsModel>(model, field,
                                       RequireWrite<EditorScalarWrite>(write, field).value);

@@ -40,6 +40,10 @@ constexpr EditorScalarUiRange kExposureRange{-10.0, 10.0, 0.0, 0.01, 2, -5.0, 5.
 /// Shadows and Highlights: the rail covers +-100. Typing extends the lift of Shadows to +150 and
 /// the recovery of Highlights to -150 (ShadowsTraits / HighlightsTraits, local tone limits).
 constexpr EditorScalarUiRange kShadowsRange{-100.0, 150.0, 0.0, 1.0, 0, -100.0, 100.0};
+/// Fill light keeps the X3Lumina / SPP units (-2..+2, 0.1 steps) so a value
+/// carried over from a sidecar means the same thing. The Grade schedule folds it
+/// into the LocalTone shadow lift, which is why it works on every input.
+constexpr EditorScalarUiRange kFillLightRange{-2.0, 2.0, 0.0, 0.1, 2, -2.0, 2.0};
 constexpr EditorScalarUiRange kHighlightsRange{-150.0, 100.0, 0.0, 1.0, 0, -100.0, 100.0};
 constexpr EditorScalarUiRange kPercentRange{0.0, 100.0, 0.0, 1.0, 0};
 /// Film Grain: 100 % is the datasheet granularity of the film (decision U3).
@@ -1605,8 +1609,8 @@ auto ModelEntry(std::string_view field, std::string_view alias, EditorAdjustment
 // Values of the Tone, Look, LUT, Post Processing, RAW Decode, Geometry, and Display Transform
 // panels. The exposure default is the neutral reset value; the product Default document starts
 // at +1.5 EV.
-auto Table() -> const std::array<EditorParameterCatalogEntry, 25>& {
-  static const std::array<EditorParameterCatalogEntry, 25> entries = {
+auto Table() -> const std::array<EditorParameterCatalogEntry, 26>& {
+  static const std::array<EditorParameterCatalogEntry, 26> entries = {
       Scalar("exposure", {}, EditorAdjustmentField::Exposure, "tone", "exposure_ev",
              Conversion::Identity, kExposureRange),
       Scalar("contrast", {}, EditorAdjustmentField::Contrast, "tone", "contrast",
@@ -1615,6 +1619,8 @@ auto Table() -> const std::array<EditorParameterCatalogEntry, 25>& {
              Conversion::Identity, kHighlightsRange),
       Scalar("shadows", {}, EditorAdjustmentField::Shadows, "tone", "shadows",
              Conversion::Identity, kShadowsRange),
+      Scalar("fill_light", {}, EditorAdjustmentField::FillLight, "tone", "fill_light",
+             Conversion::Identity, kFillLightRange),
       Scalar("white", "whites", EditorAdjustmentField::Whites, "tone", "white",
              Conversion::Identity, kSignedPercentRange),
       Scalar("black", "blacks", EditorAdjustmentField::Blacks, "tone", "black",

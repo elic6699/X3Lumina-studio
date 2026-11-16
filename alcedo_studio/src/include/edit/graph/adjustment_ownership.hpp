@@ -50,7 +50,7 @@ enum class AdjustmentParameterOwner : std::uint8_t {
  *
  * Clarity, Sharpen, Halation, and Film Grain are not included.
  */
-[[nodiscard]] auto ColorGradeAdjustmentTypes() -> std::array<OperatorTypeId, 13>;
+[[nodiscard]] auto ColorGradeAdjustmentTypes() -> std::array<OperatorTypeId, 14>;
 
 /**
  * @brief DRT/Post catalog types in reference order: Clarity, Sharpen, Halation,
@@ -69,7 +69,7 @@ enum class AdjustmentParameterOwner : std::uint8_t {
  * Local Tone before the Curve, so Shadows and Highlights act on the basic tone
  * result and the Curve shapes their output.
  */
-[[nodiscard]] auto ColorGradeCompileOrder() -> std::array<OperatorTypeId, 13>;
+[[nodiscard]] auto ColorGradeCompileOrder() -> std::array<OperatorTypeId, 14>;
 
 /** @brief Stage group of a Color Grade adjustment in @ref ColorGradeCompileOrder. */
 enum class ColorGradeCompileGroup : std::uint8_t {

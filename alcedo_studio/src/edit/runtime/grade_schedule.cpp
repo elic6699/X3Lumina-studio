@@ -4,6 +4,7 @@
 
 #include "edit/runtime/grade_schedule.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace alcedo {
@@ -86,12 +87,27 @@ auto MakeGradeSchedule(std::span<const CompiledGradeStage> stages,
         break;
       }
       case CompiledGradeStageKind::LocalLaplacian: {
+        float fill_light = 0.0f;
         for (std::size_t index = begin; index < end; ++index) {
           if (bound[index].behavior == AdjustmentBehavior::Shadows) {
             schedule.shadows_slider = bound[index].llf_control;
           } else if (bound[index].behavior == AdjustmentBehavior::Highlights) {
             schedule.highlights_slider = bound[index].llf_control;
+          } else if (bound[index].behavior == AdjustmentBehavior::FillLight) {
+            fill_light = bound[index].llf_control;
           }
+        }
+        // Fill light rides the same LLF: it is a shadow lift measured against a
+        // local luminance map, which is exactly what the LocalLaplacian stage
+        // does, and the reason it works on every input instead of only on the
+        // Foveon decode. +1 (the SPP panel's midpoint) maps to a +60 shadow
+        // slider, and the highlights give back a little so the whole frame does
+        // not drift brighter. Zero leaves both sliders byte-identical.
+        if (fill_light != 0.0f) {
+          schedule.shadows_slider =
+              std::clamp(schedule.shadows_slider + fill_light * 60.0f, -100.0f, 150.0f);
+          schedule.highlights_slider =
+              std::clamp(schedule.highlights_slider - fill_light * 8.0f, -150.0f, 150.0f);
         }
         if (ops.empty() || ops.back().kind != CompiledGradeStageKind::LocalLaplacian) {
           ops.push_back(GradeScheduledOp{CompiledGradeStageKind::LocalLaplacian, {}, {}});

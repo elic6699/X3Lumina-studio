@@ -37,7 +37,7 @@ Item {
     // main application's job (its existing Develop panel), so repeating them
     // here would be a second, divergent tone pass.
     readonly property var groups: [
-        { key: "fill", title: qsTr("Fill Light") },
+        // Fill light is a Tone slider now (under Blacks), for every document.
         { key: "highlight", title: qsTr("Highlight") },
         { key: "detail", title: qsTr("Detail") },
         { key: "nr", title: qsTr("Noise Reduction") },
@@ -98,7 +98,12 @@ Item {
         }
         if (group === "spp")
             return []
-        return root.specs.filter(function (s) { return s.group === group })
+        // Fill light moved to the Tone panel (under Blacks) so every document can
+        // use it; the decode copy is forced to zero, so keeping the slider here
+        // would be a second, inert control.
+        return root.specs.filter(function (s) {
+            return s.group === group && s.key !== "fill_light"
+        })
     }
 
     Component.onCompleted: root.refreshSpecs()

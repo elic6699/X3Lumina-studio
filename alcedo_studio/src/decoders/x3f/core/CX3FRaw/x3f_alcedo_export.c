@@ -149,9 +149,13 @@ int x3f_alcedo_model_gen(const char *path) {
 
 int x3f_alcedo_sdq_hl_capable(const char *path) {
     if (!path || !*path) return 0;
-    /* Body-based, not gain-based: SDQ reports DigitalISOGain=(1,1,1) yet still
-     * exposes the slider in X3Lumina. SDQH actually normalises (4,4,2). */
-    return x3f_render_probe_is_sdq_body(path) ? 1 : 0;
+    /* SDQH only (user decision 2026-11-16): the slider exists to normalise the
+     * DigitalISOGain that SD Quattro H reports as (4,4,2). Plain SD Quattro
+     * reports (1,1,1) — the same slider there multiplies by 1.0 and does
+     * nothing, so it must not be offered at all rather than sit inert. */
+    return (x3f_render_probe_is_sdq_body(path) && x3f_render_probe_sdq_hl(path))
+               ? 1
+               : 0;
 }
 
 int x3f_alcedo_sdq_hl_effective(const char *path) {
