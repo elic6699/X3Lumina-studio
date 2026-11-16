@@ -14403,87 +14403,93 @@ static void apply_hf_soften(void *vout, int w, int h, int stride, int bits)
     free(jb.Y); free(jb.tmp); free(jb.blur);
 }
 
-static int sdq_cmp_f(const void *a, const void *b)
-{
-    const float x = *(const float *)a, y = *(const float *)b;
-    return (x < y) ? -1 : (x > y);
-}
-
-/* 线性域的「SDQ 高光收色」。
+/* 线性域的「SDQ 高光收色」—— 把 X3Lumina 的**显示域公式**原样搬到
+ * look_defer 的出口（apply_row / apply_common 的显示域阶段在 defer 下整段不跑，
+ * 所以 sdq_hl 在 Develop DAG 的馈送里原本一个像素也动不了）。
  *
- * 显示域那条（sdq_weight_at）的判据是显示亮度 + 色差，而 look_defer 的出口
- * 还没有曲线，拿不到显示值 —— 于是 SDQ 滑杆在线性馈送（Develop DAG）里完全
- * 无效。这里的做法是把同样的判据搬到线性的**相对**亮度上：
+ * 判据与权重完全照抄原版（x3f_render.c 的 hl_desat + sdq_neut_w，
+ * Views.swift 的 SDQ 高光滑杆）：
  *
- *   white = 线性 Y 的 99.5 分位（画面白点，随机采样估计）
- *   yy    = Y / white          —— 与显示域 Y 单调对应的 0..1 量
- *   权重  = sstep01(0.29, 0.67, yy) × 色差排除
+ *     Y 够高（显示 Y ≥ 0.58 起、0.84 全量）
+ *     且不是浓彩色（显示色差 dmx−dmn < 0.40 起收、0.55 以上排除）
+ *     两路取并集：上面这条显示判据，加上 RAW 饱和分那条（clip 0.40→1.20 渐入，
+ *     与显示亮度无关 —— 原版 hl_desat 的主路，两个通道顶到饱和就收）
+ *     目标 = 显示 Y；判「确定是白」时改用最亮通道（否则只停在 B 掉下来那档）
  *
- * 0.29 / 0.67 就是显示域 0.58 / 0.84 换回线性的值。用相对白点而不是绝对
- * 线性值，是因为 DAG 的曝光和曲线在解码之后才知道：显示域的 0.58 对应哪个
- * 线性值取决于下游怎么拉。归一化之后判据与曝光无关。
+ * 唯一的改写是"显示值"的来源：defer 出口还没有 tone 曲线，于是用
+ *     e = srgb_encode(clamp(lin / X3F_OE_LIN_WHITE, 0, 1))
+ * 当显示域的代理 —— X3F_OE_LIN_WHITE 就是传感器饱和（= 出图白点），所以
+ * e 与 16 位出口的码值同量级同形状。**上一版把判据直接算在场景线性上，
+ * 色差门槛 0.40/0.55 是显示域的数：线性域里一个 (233,228,170) 的淡黄相对
+ * 色差就有 0.5，于是被"浓彩色"项全部挡掉 —— 那正是滑杆"怎么拖都没反应"的
+ * 原因。**
  *
- * 再与 RAW 逐通道饱和分（clip，0..3）取并集：cs ≥ 2.4 三通道全饱和 ⇒ 这
- * 就是白，这是 X3Lumina 里 sdq_scene_judge 的第二项，补“引擎把高光压到
- * Y 0.7 后显示判据够不到”的那块。
+ * 落回线性时朝"同显示亮度的中性值"插值：w=1 时三通道严格相等（真收白），
+ * 通道值不低于 0，也不引入任何裁剪 —— 关掉滑杆（w=0）逐位等于原输出，
+ * 广色域的原生数据照旧。
  *
- * 两者都排除浓彩色（相对色差 0.40 起渐出、0.55 排除），否则橙色反光会被收
- * 成灰。只对 SDQ/SDQH 生效（DigitalISOGain != 1）；滑杆 0 时整块不进
- * ⇒ 未拖动逐位零回归。 */
+ * 只对 SDQ/SDQH 生效（DigitalISOGain != 1）；滑杆 0 时整块不进。 */
 static void sdq_linear_desat(float *out, const float *clip, int w, int h,
                              int stride, double strength)
 {
-    const size_t npix = (size_t)w * (size_t)h;
-    size_t       step, n = 0, i;
-    float       *samples;
-    double       white;
+    const double kWhite = X3F_OE_LIN_WHITE;  /* 传感器饱和 = 出图白点 */
     int          y;
 
-    if (out == NULL || npix == 0 || strength <= 0.0) return;
-    if (strength > 1.0) strength = 1.0;
-
-    step = npix / 20000u;
-    if (step < 1u) step = 1u;
-    samples = (float *)malloc((npix / step + 2u) * sizeof(float));
-    if (samples == NULL) return;
-    for (i = 0; i < npix; i += step) {
-        const float *px = (float *)((char *)out +
-                                    (size_t)(i / (size_t)w) * (size_t)stride) +
-                          (i % (size_t)w) * 3;
-        samples[n++] = (float)(0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2]);
-    }
-    if (n == 0) { free(samples); return; }
-    qsort(samples, n, sizeof(float), sdq_cmp_f);
-    white = samples[(size_t)((double)(n - 1) * 0.995)];
-    free(samples);
-    if (!(white > 1e-4)) white = 1e-4;
+    if (out == NULL || w <= 0 || h <= 0 || strength <= 0.0) return;
+    if (strength > 2.0) strength = 2.0;
 
     for (y = 0; y < h; y++) {
         float *d = (float *)((char *)out + (size_t)y * (size_t)stride);
         const float *c = clip ? clip + (size_t)y * (size_t)w : NULL;
         int x;
         for (x = 0; x < w; x++) {
-            const double cs = c ? c[x] : 0.0;
-            double ww, w_disp, w_clip, yv, yy, mx, mn, rel;
-            float *px;
+            float *px = d + (size_t)x * 3;
+            double r = px[0], g = px[1], b = px[2];
+            double yl = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            double e0, e1, e2, dmn, dmx, ye, wd, ww, wc, cs, t, nlin;
             int k;
-            px = d + (size_t)x * 3;
-            mx = mn = px[0];
-            for (k = 1; k < 3; k++) {
-                if (px[k] > mx) mx = px[k];
-                if (px[k] < mn) mn = px[k];
+
+            /* ① RAW 饱和分那一路（原版的主路）：两个通道顶到传感器上限就
+             * 说明这个高光的颜色不可信，按饱和分在 0.40~1.20 之间渐入收色，
+             * 与显示亮度无关 —— 所以压曝光把层次拉出来以后它照样在。门槛与
+             * 原版 X3F_HL_DESAT_CLIP_LO/HI 一致。 */
+            cs = (c != NULL) ? (double)c[x] : -1.0;
+            wc = (cs >= 0.0) ? sstep01(X3F_HL_DESAT_CLIP_LO,
+                                       X3F_HL_DESAT_CLIP_HI, cs) * strength : 0.0;
+            if (wc > 1.0) wc = 1.0;
+
+            /* ② 显示域判据那一路只在显示亮度够高时才可能非零（Y 0.58 起，
+             * s > 1 时门槛下移到 0.48）。两路都够不到就直接跳过，省掉 pow。 */
+            if (yl < 0.24 && wc <= 0.001) continue;
+
+            e0 = srgb_encode(r / kWhite > 1.0 ? 1.0 : (r > 0.0 ? r / kWhite : 0.0));
+            e1 = srgb_encode(g / kWhite > 1.0 ? 1.0 : (g > 0.0 ? g / kWhite : 0.0));
+            e2 = srgb_encode(b / kWhite > 1.0 ? 1.0 : (b > 0.0 ? b / kWhite : 0.0));
+
+            dmn = dmx = e0;
+            if (e1 < dmn) dmn = e1;
+            if (e1 > dmx) dmx = e1;
+            if (e2 < dmn) dmn = e2;
+            if (e2 > dmx) dmx = e2;
+
+            ye = 0.2126 * e0 + 0.7152 * e1 + 0.0722 * e2;
+            wd = sdq_weight_at(ye, dmx - dmn, strength);
+
+            ww = (wc > wd) ? wc : wd;
+            if (ww <= 0.001) continue;
+
+            /* 目标：先取显示亮度（= 去饱和到同亮度的中性），"确定是白"的点
+             * 改成最亮通道 —— 否则 B 会停在掉下来的那一档，看着还是淡黄。 */
+            t = ye;
+            if (wd > 0.5) {
+                if (dmx > t) t = dmx;
+            } else if (cs >= 0.0) {
+                double u = sstep01(1.6, 2.4, cs);
+                if (u > 0.0) t += (dmx - t) * u;
             }
-            rel = (mx > 1e-6) ? (mx - mn) / mx : 0.0;
-            if (rel >= 0.55) continue;
-            yv     = 0.2126 * px[0] + 0.7152 * px[1] + 0.0722 * px[2];
-            yy     = yv / white;
-            w_disp = sstep01(0.29, 0.67, yy);
-            w_clip = sstep01(1.0, 2.4, cs);
-            if (w_clip > w_disp) w_disp = w_clip;
-            ww = w_disp * (1.0 - sstep01(0.40, 0.55, rel)) * strength;
-            if (ww <= 0.0) continue;
-            for (k = 0; k < 3; k++)
-                px[k] = (float)(yv + (px[k] - yv) * (1.0 - ww));
+
+            nlin = srgb_decode(t) * kWhite;
+            for (k = 0; k < 3; k++) px[k] = (float)(px[k] + (nlin - px[k]) * ww);
         }
     }
 }

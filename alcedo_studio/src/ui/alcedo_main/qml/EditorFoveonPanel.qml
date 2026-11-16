@@ -306,6 +306,14 @@ Item {
                             visible: modelData.key === "highlight"
                             text: qsTr("Overexposure correction is a two-state switch (Off / mode8) — there is no intensity slider. Highlight de-pinking is Quattro-only; sky neutralisation applies to Merrill / classic. The three fixes are ON by default in this fork.")
                         }
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            color: root.colMuted
+                            font.pixelSize: 10
+                            visible: modelData.key === "nr"
+                            text: qsTr("Five positions each, exactly like SPP: the engine quantises to floor(v·4), so there is nothing between two dots. Leftmost dot = off. Luma NR is expensive at full resolution — luma and chroma already run on the prepared frame; the strip/chroma passes only exist for Merrill.")
+                        }
                         Repeater {
                             model: root.groupSpecs(modelData.key)
                             delegate: RowLayout {
@@ -313,6 +321,23 @@ Item {
                                 width: parent.width
                                 spacing: 6
                                 readonly property bool gated: root.gateOk(modelData)
+                                // Discrete SPP-style parameters (noise reduction:
+                                // 5 positions, detail: 7) are a dot row, not a
+                                // slider — the engine itself quantises to
+                                // floor(v*4) / (int)(v*6+0.1), so a continuous
+                                // slider advertised steps that did not exist.
+                                readonly property int levelCount: Number(modelData.levels || 0)
+                                // Inside the dot Repeater `modelData` is the dot
+                                // index, not the spec — keep the key here.
+                                readonly property string specKey: String(modelData.key || "")
+                                readonly property int levelIndex: {
+                                    if (levelCount < 2)
+                                        return -1
+                                    const v = Number(root.values[modelData.key] !== undefined
+                                                     ? root.values[modelData.key] : modelData.minimum)
+                                    const i = Math.floor(v * (levelCount - 1) + Number(modelData.bias || 0))
+                                    return Math.max(0, Math.min(levelCount - 1, i))
+                                }
                                 // The decode always runs through the native
                                 // chain, so these are live whenever an X3F is
                                 // open; 原链解码 renders its own product and
@@ -328,15 +353,68 @@ Item {
                                     elide: Text.ElideRight
                                 }
                                 Label {
-                                    visible: modelData.kind === "scalar"
+                                    visible: modelData.kind === "scalar" && controlRow.levelCount < 2
                                     color: root.colMuted
                                     font.pixelSize: 10
                                     text: Number(root.values[modelData.key] !== undefined
                                                  ? root.values[modelData.key] : modelData.minimum)
                                           .toFixed(modelData.decimals)
                                 }
-                                Slider {
+                                // ---- SPP-style dot row (X3Lumina SPPDotRow) ----
+                                RowLayout {
                                     visible: modelData.kind === "scalar"
+                                             && controlRow.levelCount > 1
+                                    spacing: 0
+                                    Label {
+                                        text: qsTr("Less")
+                                        color: root.colMuted
+                                        font.pixelSize: 9
+                                        rightPadding: 4
+                                    }
+                                    Row {
+                                        spacing: 0
+                                        Repeater {
+                                            model: controlRow.levelCount
+                                            delegate: Item {
+                                                width: 15
+                                                height: 15
+                                                Rectangle {
+                                                    anchors.centerIn: parent
+                                                    width: 12
+                                                    height: 12
+                                                    radius: 6
+                                                    color: index === controlRow.levelIndex
+                                                           ? root.colAccent
+                                                           : root.colMuted
+                                                    opacity: index === controlRow.levelIndex ? 1.0
+                                                             : (controlRow.enabled ? 0.35 : 0.18)
+                                                    border.width: 1
+                                                    border.color: root.colCardBorder
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    enabled: controlRow.enabled
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (!root.foveon)
+                                                            return
+                                                        root.foveon.SetParam(controlRow.specKey,
+                                                                             index / (controlRow.levelCount - 1))
+                                                        root.commitDecodeDigest(true)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Label {
+                                        text: qsTr("More")
+                                        color: root.colMuted
+                                        font.pixelSize: 9
+                                        leftPadding: 4
+                                    }
+                                }
+                                Slider {
+                                    visible: modelData.kind === "scalar" && controlRow.levelCount < 2
                                     Layout.preferredWidth: 130
                                     from: modelData.minimum
                                     to: modelData.maximum

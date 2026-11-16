@@ -44,6 +44,24 @@ auto Scalar(std::string key, std::string label, std::string group, double lo,
   return spec;
 }
 
+/// A discrete SPP-style dot row (X3Lumina's SPPDotRow) over the same range.
+/// `levels` positions, `bias` only to match the engine's own quantiser.
+template <auto Member>
+auto Dots(std::string key, std::string label, std::string group, double lo,
+          double hi, int levels, double bias = 0.0, std::string gate = {})
+    -> FoveonParameterSpec {
+  if (levels < 2) {
+    levels = 2;
+  }
+  FoveonParameterSpec spec = Scalar<Member>(std::move(key), std::move(label),
+                                            std::move(group), lo, hi,
+                                            1.0 / (levels - 1), 2,
+                                            std::move(gate));
+  spec.levels = levels;
+  spec.bias   = bias;
+  return spec;
+}
+
 auto Toggle(std::string key, std::string label, std::string group,
             std::string gate = {}) -> FoveonParameterSpec {
   FoveonParameterSpec spec;
@@ -83,7 +101,9 @@ auto BuildSpecs() -> std::vector<FoveonParameterSpec> {
   s.push_back(Scalar<&FoveonEditParams::highlight>("highlight", "高光", "tone", -1, 1, 0.05, 2));
   s.push_back(Scalar<&FoveonEditParams::saturation>("saturation", "饱和度", "tone", -1, 1, 0.05, 2));
 
-  s.push_back(Scalar<&FoveonEditParams::detail>("detail", "细节", "detail", 0, 1, 0.1, 2));
+  // 细节: X3Lumina quantises it to 7 positions, (int)(v*6 + 0.1). A slider
+  // promised 11 (step 0.1) and could not reach the engine's own grid.
+  s.push_back(Dots<&FoveonEditParams::detail>("detail", "细节", "detail", 0, 1, 7, 0.1));
   s.push_back(Scalar<&FoveonEditParams::sharpness>("sharpness", "锐度", "detail", 0, 2, 0.05, 2));
 
   // ---- Highlight panel, in Views.swift:2739-3575 order ----
@@ -121,11 +141,12 @@ auto BuildSpecs() -> std::vector<FoveonParameterSpec> {
   // stay so existing .x3fedit.json sidecars still load, and the C chain still
   // skips the whole gain map when fill_light == 0.
 
-  // Five SPP denoise positions in X3Lumina (0, .25, .5, .75, 1). In SPP mode
-  // the C bridge maps them onto rows 2/3/3/4/4.
-  s.push_back(Scalar<&FoveonEditParams::nr_luma>("nr_luma", "亮度降噪", "nr", 0, 1, 0.25, 2));
-  s.push_back(Scalar<&FoveonEditParams::nr_chroma>("nr_chroma", "色度降噪", "nr", 0, 1, 0.2, 2));
-  s.push_back(Scalar<&FoveonEditParams::nr_banding>("nr_banding", "条带抑制", "nr", 0, 1, 0.2, 2));
+  // Five positions each, exactly like SPP / X3Lumina (the engine quantises
+  // with floor(v*4)). They were sliders here, which advertised a finer control
+  // than the pipeline has — dragging inside one step did nothing at all.
+  s.push_back(Dots<&FoveonEditParams::nr_luma>("nr_luma", "辉度杂讯", "nr", 0, 1, 5));
+  s.push_back(Dots<&FoveonEditParams::nr_chroma>("nr_chroma", "色度杂讯", "nr", 0, 1, 5));
+  s.push_back(Dots<&FoveonEditParams::nr_banding>("nr_banding", "条纹杂讯", "nr", 0, 1, 5));
   s.push_back(Scalar<&FoveonEditParams::nr_q_base>("nr_q_base", "量化基线", "advanced", 0, 2, 0.01, 2));
   s.push_back(Scalar<&FoveonEditParams::nr_q_gate_k>("nr_q_gate_k", "量化门限增益", "advanced", 0, 2, 0.01, 2));
   s.push_back(Toggle("nr_q_gate", "量化门限", "advanced"));
@@ -317,6 +338,8 @@ auto FoveonParametersJson(const FoveonEditParams& params) -> Json {
     entry["maximum"]  = spec.maximum;
     entry["step"]     = spec.step;
     entry["decimals"] = spec.decimals;
+    entry["levels"]   = spec.levels;
+    entry["bias"]     = spec.bias;
     entry["options"]  = spec.options;
     entry["gate"]     = spec.gate;
     entry["value"]    = values.value(spec.key, Json(0.0));

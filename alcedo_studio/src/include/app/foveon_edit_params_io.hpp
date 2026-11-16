@@ -40,6 +40,15 @@ struct FoveonParameterSpec {
   double                                             maximum   = 1.0;
   double                                             step      = 0.01;
   int                                                decimals  = 2;
+  /// > 1 = a discrete SPP-style dot row with this many positions, not a
+  /// slider. X3Lumina's noise-reduction trio is 5 positions (its engine does
+  /// floor(v*4)) and "detail" is 7 (it does (int)(v*6 + 0.1)); a continuous
+  /// slider over the same range pretends the parameter is finer than it is.
+  int                                                levels    = 0;
+  /// Truncation bias when mapping a value back to a dot: index =
+  /// trunc(value * (levels - 1) + bias). Mirrors the C quantiser exactly so an
+  /// old sidecar's arbitrary value lands on the same dot the engine uses.
+  double                                             bias      = 0.0;
   std::vector<std::string>                           options;
   /// "" = always available; "quattro" / "nonquattro" / "sdq" / "hl_chroma"
   /// gate the control exactly like X3Lumina's Views.swift.
