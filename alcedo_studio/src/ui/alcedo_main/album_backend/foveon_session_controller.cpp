@@ -13,10 +13,15 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <fstream>
+#include <iterator>
 #include <utility>
+#include <vector>
 
 #include "app/foveon_edit_params_io.hpp"
 #include "decoders/x3f/x3f_support.hpp"
+#include "edit/input/prepared_raw_input.hpp"
 #include "ui/alcedo_main/album_backend/foveon_export_writer.hpp"
 
 namespace alcedo::ui {
@@ -26,6 +31,22 @@ using alcedo::x3f::FoveonCapabilities;
 using alcedo::x3f::FoveonEditParams;
 using alcedo::x3f::FoveonImage;
 using alcedo::x3f::FoveonRenderer;
+
+/// Encoded content hash of one file: the exact identity the decode cache and
+/// the Foveon parameter registry use.
+auto HashFileContent(const std::filesystem::path& path) -> std::uint64_t {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) {
+    return 0;
+  }
+  const std::vector<char> bytes((std::istreambuf_iterator<char>(in)),
+                                std::istreambuf_iterator<char>());
+  if (bytes.empty()) {
+    return 0;
+  }
+  return alcedo::HashContentBytes(
+      std::as_bytes(std::span<const char>(bytes.data(), bytes.size())));
+}
 
 auto SharedStore() -> std::shared_ptr<FoveonPreviewStore> {
   static std::shared_ptr<FoveonPreviewStore> store =
@@ -325,8 +346,10 @@ void FoveonSessionController::SetSourcePath(QString path) {
       !std::filesystem::exists(native, ec)) {
     caps_.reset();
     available_ = false;
+    content_hash_ = 0;
     decoder_choice_available_ = false;
     status_ = QStringLiteral("No X3F/X3I source");
+    PublishDecodeParams();
     if (had_visible_preview) {
       store_->Set(QImage(), revision_);
       emit PreviewChanged();
@@ -336,8 +359,9 @@ void FoveonSessionController::SetSourcePath(QString path) {
     return;
   }
 
-  caps_      = alcedo::x3f::FoveonProbe(native);
-  available_ = caps_.has_value();
+  caps_         = alcedo::x3f::FoveonProbe(native);
+  available_    = caps_.has_value();
+  content_hash_ = HashFileContent(native);
   // Quattro is fixed to own, classic to fuse (AUTO in path A). Only Merrill
   // files with a usable SPP chain get the two-state backend picker.
   decoder_choice_available_ = caps_ && caps_->OffersDecoderChoice();
@@ -354,6 +378,9 @@ void FoveonSessionController::SetSourcePath(QString path) {
   emit SourceChanged();
   emit ParametersChanged();
   emit StateChanged();
+  // The DAG decodes this file through these operators from now on, so the
+  // editor must re-render even before the user touches a slider.
+  PublishDecodeParams();
   if (enabled_ || sppMode()) {
     ScheduleRender();
   }
@@ -380,6 +407,9 @@ void FoveonSessionController::SetDecoderBackend(const QString& backend) {
                         : QStringLiteral("x3fuse"));
   // The two chains produce different products; every cached frame is stale.
   renderer_->Invalidate();
+  // 原链解码 takes the pixels away from the DAG, so the bridge must stop
+  // feeding Foveon operators (and the reverse when switching back).
+  PublishDecodeParams();
   emit DecoderChanged();
   if (sppMode()) {
     status_ = QStringLiteral("Rendering SPP native chain (原链解码)...");
@@ -420,6 +450,21 @@ void FoveonSessionController::setEnabled(bool on) {
   emit StateChanged();
 }
 
+void FoveonSessionController::PublishDecodeParams() {
+  std::uint64_t digest = 0;
+  if (available_ && content_hash_ != 0 && !sppMode()) {
+    alcedo::x3f::SetActiveFoveonParams(content_hash_, params_);
+    digest = alcedo::x3f::FoveonLinearKey(params_);
+  } else {
+    // SPP owns the pixels for "原链解码", and no source means nothing to feed.
+    alcedo::x3f::ClearActiveFoveonParams();
+  }
+  if (digest != digest_) {
+    digest_ = digest;
+    emit DecodeParamsChanged();
+  }
+}
+
 void FoveonSessionController::SetParam(QString key, QVariant value) {
   const std::string k = key.toStdString();
   bool changed = false;
@@ -435,6 +480,7 @@ void FoveonSessionController::SetParam(QString key, QVariant value) {
     return;
   }
   emit ParametersChanged();
+  PublishDecodeParams();
   if (enabled_ || sppMode()) {
     ScheduleRender();
   }
@@ -445,6 +491,7 @@ void FoveonSessionController::ResetParams() {
   status_ = QStringLiteral("Product defaults (three highlight fixes ON)");
   emit ParametersChanged();
   emit StateChanged();
+  PublishDecodeParams();
   if (enabled_ || sppMode()) {
     ScheduleRender();
   }
@@ -461,6 +508,7 @@ void FoveonSessionController::LoadSidecar() {
   }
   emit ParametersChanged();
   emit StateChanged();
+  PublishDecodeParams();
   if (enabled_ || sppMode()) {
     ScheduleRender();
   }

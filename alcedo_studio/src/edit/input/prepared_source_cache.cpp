@@ -9,6 +9,8 @@
 
 #include "edit/input/raster_input_loader.hpp"
 
+#include "decoders/x3f/x3f_foveon.hpp"
+
 namespace alcedo {
 namespace {
 
@@ -111,9 +113,13 @@ auto PreparedSourceCache::MakeLease(std::shared_ptr<Entry> entry) -> Lease {
 
 auto PreparedSourceCache::AcquireEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)
     -> Lease {
-  const auto lookup = PreparedSourceLookup{
+  PreparedSourceLookup lookup{
       HashEncoded(encoded), encoded.size(), DecodeResToDownsamplePasses(decode_res),
       kRawInputPreparationVersion};
+  // Sigma X3F: the Foveon operators live in the native decode, not in the
+  // host graph, so the parameters that drive them are part of the source
+  // identity. 0 for every other format and for an X3F with no live operators.
+  lookup.decode_variant = x3f::ActiveFoveonVariant(lookup.encoded_content_hash);
   if (auto it = entries_.find(lookup); it != entries_.end()) {
     ++stats_.hits;
     return MakeLease(it->second);
@@ -122,6 +128,10 @@ auto PreparedSourceCache::AcquireEncoded(std::span<const std::byte> encoded, Dec
   ++stats_.misses;
   ++stats_.libraw_open_unpack_count;
   auto prepared                        = unpack_(encoded, decode_res);
+  // Adopt the variant the decode actually used: the registry can move between
+  // the lookup above and the decode (a slider dragged mid-decode), and the
+  // entry must be filed under the parameters that produced its pixels.
+  lookup.decode_variant                    = prepared.source_key.decode_variant;
   prepared.content_key.content_hash    = lookup.encoded_content_hash;
   prepared.source_key.encoded_content_hash = lookup.encoded_content_hash;
   prepared.source_key.encoded_byte_count   = lookup.encoded_byte_count;

@@ -182,6 +182,13 @@ void DevelopParamsModel::ApplyRawDecodeUpdate(DevelopRawDecodeUpdate update) {
       payload.user_wb = *update.user_wb;
       changed |= DirtyFieldMask{DevelopDirty::WhiteBalance};
     }
+    if (update.foveon_digest.has_value() &&
+        payload.foveon_digest != *update.foveon_digest) {
+      payload.foveon_digest = *update.foveon_digest;
+      // The operators change the decoded pixels themselves, so nothing of the
+      // previous result survives: invalidate the whole document.
+      changed |= DirtyFieldMask{DevelopDirty::All};
+    }
     return changed;
   });
 }
@@ -442,6 +449,10 @@ auto DevelopParamsModel::ToJson() const -> nlohmann::json {
   if (payload.input.has_value()) {
     value["input"] = DevelopRasterInputToJson(*payload.input);
   }
+  // Same rule for the X3F digest: absent unless Foveon operators are live.
+  if (payload.foveon_digest != 0) {
+    value["foveon_digest"] = payload.foveon_digest;
+  }
   return value;
 }
 
@@ -526,6 +537,10 @@ void DevelopParamsModel::LoadJson(const nlohmann::json& json) {
         json.contains("input")
             ? std::optional<DevelopRasterInput>(DevelopRasterInputFromJson(json["input"]))
             : std::nullopt;
+    payload.foveon_digest =
+        json.contains("foveon_digest") && json["foveon_digest"].is_number_unsigned()
+            ? json["foveon_digest"].get<std::uint64_t>()
+            : 0;
   });
 }
 
@@ -581,6 +596,9 @@ void DevelopParamsModel::ReplaceParams(DevelopPayload payload) {
     }
     if (payload.input != dest.input) {
       changed |= DirtyFieldMask{DevelopDirty::Input};
+    }
+    if (payload.foveon_digest != dest.foveon_digest) {
+      changed |= DirtyFieldMask{DevelopDirty::All};
     }
     dest = std::move(payload);
     return changed.Any() ? changed : DirtyFieldMask{DevelopDirty::All};

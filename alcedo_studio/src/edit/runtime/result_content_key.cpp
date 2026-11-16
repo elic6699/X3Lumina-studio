@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include "decoders/x3f/x3f_foveon.hpp"
 #include "edit/graph/adjustment_ownership.hpp"
 #include "edit/graph/color_grade_node_model.hpp"
 #include "edit/graph/develop_node_model.hpp"
@@ -53,6 +54,11 @@ auto MixPreparedSource(ContentHash& hash, const PreparedSourceKey& key) -> void 
   MixRect(hash, key.sensor_active_area);
   hash.MixI32(key.orientation_flip);
   hash.MixU32(key.preparation_version);
+  // Sigma X3F: the Foveon operators run inside the native decode, so the same
+  // encoded bytes can produce different pixels. The variant is the digest of
+  // the parameters that *produced this plane* — not the live slider state — so
+  // a stale decode can never be served from the result cache. 0 elsewhere.
+  hash.MixU64(key.decode_variant);
 }
 
 auto MixLinearization(ContentHash& hash, const RawLinearizationParams& linearization) -> void {
@@ -76,6 +82,10 @@ auto MixLinearization(ContentHash& hash, const RawLinearizationParams& lineariza
 auto MixSensorDevelopParams(ContentHash& hash, const DevelopPayload& params) -> void {
   hash.MixText(params.demosaic_method);
   hash.MixBool(params.highlights_reconstruct);
+  // X3F: the Foveon operators are part of the decode, so their digest belongs
+  // to the sensor-stage identity, not to a downstream node.
+  hash.MixI32(static_cast<std::int32_t>(params.foveon_digest & 0xFFFFFFFFULL));
+  hash.MixI32(static_cast<std::int32_t>(params.foveon_digest >> 32));
   hash.MixBool(params.lens_enabled);
   hash.MixBool(params.apply_vignetting);
   hash.MixBool(params.apply_distortion);

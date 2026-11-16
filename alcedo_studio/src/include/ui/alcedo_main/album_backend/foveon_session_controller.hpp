@@ -83,6 +83,11 @@ class FoveonSessionController final : public QObject {
   Q_PROPERTY(bool sppMode READ sppMode NOTIFY DecoderChanged)
   /// True while an independent 16-bit sRGB export is running on the worker.
   Q_PROPERTY(bool exporting READ exporting NOTIFY ExportStateChanged)
+  /// Digest of the Foveon decode parameters currently live in the decoder
+  /// bridge. The panel echoes it back through the RAW Decode node so a slider
+  /// move is a document change (re-render, history, result-key) rather than a
+  /// silent sidecar edit. 0 means the native operators are not applied.
+  Q_PROPERTY(QString decodeDigest READ decodeDigest NOTIFY DecodeParamsChanged)
 
  public:
   /// Resolves the on-disk source path of the currently open image id. Injected
@@ -121,6 +126,11 @@ class FoveonSessionController final : public QObject {
   [[nodiscard]] auto parametersJson() const -> QString;
   [[nodiscard]] auto valuesJson() const -> QString;
   [[nodiscard]] auto exporting() const -> bool { return exporting_; }
+  /// 64-bit digest as text: QML numbers are doubles and would lose the low
+  /// bits of a 64-bit hash, which is exactly what identifies a decode.
+  [[nodiscard]] auto decodeDigest() const -> QString {
+    return QString::number(static_cast<qulonglong>(digest_));
+  }
   /// Worker-side check: a queued render whose generation is stale can return
   /// before paying the SPP prepare cost.
   [[nodiscard]] auto IsCurrentRenderGeneration(std::uint64_t generation) const
@@ -159,11 +169,16 @@ class FoveonSessionController final : public QObject {
   void ParametersChanged();
   void PreviewChanged();
   void DecoderChanged();
+  void DecodeParamsChanged();
   void ExportStateChanged();
   void ExportFinished(bool ok, QString message);
 
  private:
   void ScheduleRender();
+  /// Publish (or withdraw) this file's Foveon operators in the decoder bridge.
+  /// Publish is keyed by the encoded content hash, so the render worker's
+  /// decode and PreparedSourceCache agree on identity.
+  void PublishDecodeParams();
 
   PathResolver                                resolver_;
   alcedo::x3f::FoveonEditParams               params_;
@@ -186,6 +201,10 @@ class FoveonSessionController final : public QObject {
   bool                                        exporting_ = false;
   std::atomic<std::uint64_t>                  generation_{0};
   std::uint64_t                               revision_  = 0;
+  /// Encoded content hash of the open X3F (the key the decode cache uses).
+  std::uint64_t                               content_hash_ = 0;
+  /// Digest last published to the bridge; echoed to QML as decodeDigest.
+  std::uint64_t                               digest_       = 0;
   int                                         preview_long_edge_ = 1280;
 };
 

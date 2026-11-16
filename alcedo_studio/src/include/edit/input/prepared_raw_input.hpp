@@ -110,13 +110,20 @@ struct PreparedSourceLookup {
   std::uint64_t encoded_byte_count   = 0;
   std::uint8_t  downsample_passes    = 0;
   std::uint32_t preparation_version  = kRawInputPreparationVersion;
+  /// 0 for every Raster/Bayer source. Sigma X3F files whose Foveon operators
+  /// (fill light, highlight, detail, NR) are live carry the digest of those
+  /// parameters here, so changing one is a miss (re-decode) while an exposure
+  /// or curve change stays a hit. It is NOT part of PreparedSourceKey: the
+  /// document's content identity must not move when a slider moves.
+  std::uint64_t decode_variant = 0;
 };
 
 inline auto operator==(const PreparedSourceLookup& a, const PreparedSourceLookup& b) -> bool {
   return a.encoded_content_hash == b.encoded_content_hash &&
          a.encoded_byte_count == b.encoded_byte_count &&
          a.downsample_passes == b.downsample_passes &&
-         a.preparation_version == b.preparation_version;
+         a.preparation_version == b.preparation_version &&
+         a.decode_variant == b.decode_variant;
 }
 
 inline auto operator<(const PreparedSourceLookup& a, const PreparedSourceLookup& b) -> bool {
@@ -129,7 +136,10 @@ inline auto operator<(const PreparedSourceLookup& a, const PreparedSourceLookup&
   if (a.downsample_passes != b.downsample_passes) {
     return a.downsample_passes < b.downsample_passes;
   }
-  return a.preparation_version < b.preparation_version;
+  if (a.preparation_version != b.preparation_version) {
+    return a.preparation_version < b.preparation_version;
+  }
+  return a.decode_variant < b.decode_variant;
 }
 
 /**
@@ -140,6 +150,12 @@ struct PreparedSourceKey {
   std::uint64_t      encoded_byte_count   = 0;
   RawInputKind       input_kind           = RawInputKind::BayerRaw;
   std::uint64_t      cfa_hash             = 0;
+  /// Digest of the Foveon operators **that actually produced these pixels**
+  /// (0 for every other format). Stored with the plane rather than read from the
+  /// live parameter registry, so the identity always describes the data: a
+  /// plane decoded before the editor published its operators keeps variant 0
+  /// and can never be mistaken for one decoded with them.
+  std::uint64_t      decode_variant       = 0;
   std::uint64_t      dng_warp_hash        = 0;
   std::uint8_t       downsample_passes    = 0;
   RectI              sensor_active_area{};
@@ -148,7 +164,7 @@ struct PreparedSourceKey {
 
   [[nodiscard]] auto Lookup() const -> PreparedSourceLookup {
     return PreparedSourceLookup{encoded_content_hash, encoded_byte_count, downsample_passes,
-                                preparation_version};
+                                preparation_version, decode_variant};
   }
 };
 
@@ -158,7 +174,8 @@ inline auto operator==(const PreparedSourceKey& a, const PreparedSourceKey& b) -
          a.cfa_hash == b.cfa_hash && a.dng_warp_hash == b.dng_warp_hash &&
          a.downsample_passes == b.downsample_passes &&
          a.sensor_active_area == b.sensor_active_area && a.orientation_flip == b.orientation_flip &&
-         a.preparation_version == b.preparation_version;
+         a.preparation_version == b.preparation_version &&
+         a.decode_variant == b.decode_variant;
 }
 
 /**

@@ -15,6 +15,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
+#include <map>
+#include <mutex>
 #include <string_view>
 #include <utility>
 
@@ -329,6 +331,22 @@ auto FoveonFrame::PrepareImpl(const std::filesystem::path& path,
   frame.decode_key_ = x3f_alcedo_foveon_decode_key(&c_params);
   x3f_alcedo_foveon_geometry(raw, &frame.geometry_.width, &frame.geometry_.height,
                              &frame.geometry_.orientation);
+  // The C frame reports the legacy X3F header rotation, which is 1 on every
+  // body that writes rotation only in the embedded JPEG (all Quattro files).
+  // Path A resolved this as "EXIF wins, header is the SD9..SD15 fallback", so
+  // the Develop feed must resolve it the same way or the frame arrives rotated.
+  {
+    int exif = 1;
+    // -1 selects the same full-size embedded JPEG that import reads its EXIF
+    // from, so the render and the document agree on the rotation.
+    if (const auto jpeg = ReadEmbeddedJpeg(path, -1); !jpeg.empty()) {
+      exif = EmbeddedJpegOrientation(jpeg);
+    }
+    const int resolved = ResolveOrientation(path, exif);
+    if (resolved >= 1 && resolved <= 8) {
+      frame.geometry_.orientation = resolved;
+    }
+  }
   if (frame.geometry_.orientation < 1 || frame.geometry_.orientation > 8) {
     frame.geometry_.orientation = 1;
   }
@@ -490,11 +508,11 @@ auto FoveonFrame::Apply(const FoveonEditParams& params) const
   if (raw.linear_rgb != nullptr) {
     std::free(raw.linear_rgb);
   }
-  image.width       = raw.width;
-  image.height      = raw.height;
-  image.orientation = (raw.orientation >= 1 && raw.orientation <= 8)
-                          ? raw.orientation
-                          : 1;
+  image.width  = raw.width;
+  image.height = raw.height;
+  // geometry_ carries the EXIF-authoritative rotation resolved at prepare()
+  // time; the C frame only knows the legacy header field.
+  image.orientation = geometry_.orientation;
   return image;
 }
 
@@ -516,11 +534,11 @@ auto FoveonFrame::ApplyLinear(const FoveonEditParams& params) const
   image.rgb = std::shared_ptr<const float>(raw.linear_rgb, [](const float* p) {
     std::free(const_cast<float*>(p));
   });
-  image.width       = raw.width;
-  image.height      = raw.height;
-  image.orientation = (raw.orientation >= 1 && raw.orientation <= 8)
-                          ? raw.orientation
-                          : 1;
+  image.width  = raw.width;
+  image.height = raw.height;
+  // geometry_ carries the EXIF-authoritative rotation resolved at prepare()
+  // time; the C frame only knows the legacy header field.
+  image.orientation = geometry_.orientation;
   return image;
 }
 
@@ -740,6 +758,57 @@ auto RenderSppOnce(const std::filesystem::path& path, int frame)
 auto FoveonLastError() -> std::string {
   const char* text = x3f_alcedo_foveon_error();
   return text == nullptr ? std::string{} : std::string(text);
+}
+
+namespace {
+
+struct ActiveParams {
+  std::mutex                            mutex;
+  std::map<std::uint64_t, FoveonEditParams> entries;
+};
+
+auto ActiveStore() -> ActiveParams& {
+  static ActiveParams store;
+  return store;
+}
+
+}  // namespace
+
+void SetActiveFoveonParams(std::uint64_t content_hash,
+                           const FoveonEditParams& params) {
+  if (content_hash == 0) {
+    return;
+  }
+  auto& store = ActiveStore();
+  const std::lock_guard lock(store.mutex);
+  store.entries[content_hash] = params;
+  // Only the image the editor holds can be rendered; keeping a handful guards
+  // against the preview/export pair of one document without growing forever.
+  while (store.entries.size() > 4) {
+    store.entries.erase(store.entries.begin());
+  }
+}
+
+void ClearActiveFoveonParams() {
+  auto& store = ActiveStore();
+  const std::lock_guard lock(store.mutex);
+  store.entries.clear();
+}
+
+auto ActiveFoveonParams(std::uint64_t content_hash)
+    -> std::optional<FoveonEditParams> {
+  auto& store = ActiveStore();
+  const std::lock_guard lock(store.mutex);
+  const auto it = store.entries.find(content_hash);
+  if (it == store.entries.end()) {
+    return std::nullopt;
+  }
+  return it->second;
+}
+
+auto ActiveFoveonVariant(std::uint64_t content_hash) -> std::uint64_t {
+  const auto params = ActiveFoveonParams(content_hash);
+  return params ? FoveonLinearKey(*params) : 0;
 }
 
 }  // namespace alcedo::x3f

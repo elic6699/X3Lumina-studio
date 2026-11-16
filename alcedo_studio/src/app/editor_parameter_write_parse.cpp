@@ -459,7 +459,8 @@ auto ParseRawDecodeUpdate(const nlohmann::json& params) -> DevelopRawDecodeUpdat
                      "target_projection",
                      "lens_profile_db_path",
                      "lens_maker",
-                     "lens_model"},
+                     "lens_model",
+                     "foveon_digest"},
                     "raw_decode");
   DevelopRawDecodeUpdate update;
   update.demosaic_method = ReadOptionalString(object, {"demosaic_method", "method"}, "raw_decode");
@@ -467,6 +468,21 @@ auto ParseRawDecodeUpdate(const nlohmann::json& params) -> DevelopRawDecodeUpdat
       ReadOptionalBool(object, {"highlights_reconstruct"}, "raw_decode");
   update.use_camera_wb = ReadOptionalBool(object, {"use_camera_wb"}, "raw_decode");
   update.user_wb       = ReadOptionalFloat(object, {"user_wb"}, "raw_decode");
+  // Sigma X3F only. The value itself is published to the decoder bridge; this
+  // field makes a Foveon slider move a document change so the preview re-renders.
+  if (const auto it = object.find("foveon_digest"); it != object.end()) {
+    // The panel sends the 64-bit digest as text so QML's double cannot truncate
+    // it; a plain unsigned is accepted too.
+    if (it->is_string()) {
+      try {
+        update.foveon_digest = std::stoull(it->get<std::string>());
+      } catch (const std::exception&) {
+        update.foveon_digest = 0;
+      }
+    } else if (it->is_number_unsigned()) {
+      update.foveon_digest = it->get<std::uint64_t>();
+    }
+  }
   return update;
 }
 

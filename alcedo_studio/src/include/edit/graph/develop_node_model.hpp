@@ -199,6 +199,13 @@ struct DevelopPayload {
   /// Present only for a raster (JPEG, PNG, TIFF, OpenEXR) document; absent means RAW. A RAW
   /// document never serializes the `input` key, so its JSON and root id stay as before.
   std::optional<DevelopRasterInput> input;
+  /// Sigma X3F only: digest of the Foveon decode parameters the editor has
+  /// published (fill light, highlight, detail, NR). The values themselves live
+  /// in the decoder bridge, keyed by the file's content hash; this field exists
+  /// so a change is a document change — it re-renders the preview, enters
+  /// history, and moves the result content key. 0 means "no Foveon operators",
+  /// and a non-X3F document never serializes the key.
+  std::uint64_t foveon_digest = 0;
 };
 
 inline auto operator==(const DevelopPayload& a, const DevelopPayload& b) -> bool {
@@ -215,7 +222,8 @@ inline auto operator==(const DevelopPayload& a, const DevelopPayload& b) -> bool
          a.projection_enabled == b.projection_enabled &&
          a.target_projection == b.target_projection &&
          a.lens_profile_db_path == b.lens_profile_db_path && a.lens_maker == b.lens_maker &&
-         a.lens_model == b.lens_model && a.input == b.input;
+         a.lens_model == b.lens_model && a.input == b.input &&
+         a.foveon_digest == b.foveon_digest;
 }
 
 inline auto operator!=(const DevelopPayload& a, const DevelopPayload& b) -> bool {
@@ -245,6 +253,8 @@ struct DevelopRawDecodeUpdate {
   std::optional<bool>        highlights_reconstruct;
   std::optional<bool>        use_camera_wb;
   std::optional<float>       user_wb;
+  /// X3F only: digest of the Foveon decode parameters the editor published.
+  std::optional<std::uint64_t> foveon_digest;
 };
 
 /**

@@ -121,6 +121,20 @@ Item {
         function onParametersChanged() { root.refreshValues() }
         function onSourceChanged() { root.refreshSpecs() }
         function onDecoderChanged() { root.refreshSpecs() }
+        // These operators live in the decode, so a change is a document change:
+        // echo the new digest through the RAW Decode node to re-render, enter
+        // history and move the result key. settled=false while a slider drags.
+        function onDecodeParamsChanged() { root.commitDecodeDigest(false) }
+    }
+
+    function commitDecodeDigest(settled) {
+        if (!root.foveon || !root.editorSession)
+            return
+        if (typeof root.editorSession.submitPatch !== "function")
+            return
+        root.editorSession.submitPatch("raw",
+                                       JSON.stringify({ foveon_digest: String(root.foveon.decodeDigest) }),
+                                       settled)
     }
 
     ColumnLayout {
@@ -186,7 +200,14 @@ Item {
                     wrapMode: Text.WordWrap
                     color: root.colMuted
                     font.pixelSize: 11
-                    text: qsTr("Only the controls that have no Alcedo equivalent are shown here — exposure, contrast, colour, curves and WB stay in the main Develop panels.")
+                    text: qsTr("Decoder: Quattro bodies (DP-Q, SD Quattro, SD Quattro H, SFD) always decode with own; classic bodies always with fuse. 原链解码 is not a third decoder — it is a second path inside Merrill's fuse decode and only exists there, so only Merrill shows the choice.")
+                }
+                Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    color: root.colMuted
+                    font.pixelSize: 11
+                    text: qsTr("These controls run inside the decode, before the Develop graph, so they are live in both fuse and own. Under 原链解码 the SPP chain owns the pixels and only its own six tone controls apply. Everything downstream — exposure, contrast, colour, curves, WB — is the main Develop panels' job and is deliberately not repeated here.")
                 }
                 Label {
                     Layout.fillWidth: true
@@ -226,7 +247,6 @@ Item {
                 text: qsTr("Export 16-bit sRGB (Foveon / SPP)")
                 enabled: root.foveon && root.foveon.available
                          && root.controlsEnabled && !root.foveon.exporting
-                         && (root.foveon.enabled || root.foveon.sppMode)
                 onClicked: foveonExportDialog.open()
             }
         }
@@ -269,13 +289,12 @@ Item {
                                 width: parent.width
                                 spacing: 6
                                 readonly property bool gated: root.gateOk(modelData)
+                                // The decode always runs through the native
+                                // chain, so these are live whenever an X3F is
+                                // open; 原链解码 renders its own product and
+                                // hides the groups instead.
                                 enabled: gated && root.controlsEnabled && root.foveon
                                          && root.foveon.available
-                                         // These controls only exist in the
-                                         // native chain; with it switched off
-                                         // they would silently do nothing.
-                                         && (root.foveon.enabled
-                                             || root.foveon.sppMode)
 
                                 Label {
                                     text: modelData.label
@@ -302,6 +321,7 @@ Item {
                                                   ? root.values[modelData.key] : modelData.minimum)
                                     onMoved: if (root.foveon)
                                                  root.foveon.SetParam(modelData.key, value)
+                                    onReleased: root.commitDecodeDigest(true)
                                 }
                                 CheckBox {
                                     visible: modelData.kind === "toggle"

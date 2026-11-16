@@ -344,4 +344,32 @@ class FoveonRenderer {
 /// Last error reported by the C path-B chain (static string, no free).
 [[nodiscard]] auto FoveonLastError() -> std::string;
 
+// ── Active decode parameters for the Develop pipeline ──────────────────────
+//
+// The Foveon operators (fill light, highlight, detail, noise reduction) run
+// inside the native decode, not in the host DAG, so the decode must know them.
+// The Develop payload only carries a digest (it drives the re-render); these
+// accessors carry the parameters themselves, keyed by the encoded content hash
+// so a stale entry can never be applied to another file.
+//
+// Thread-safe: the UI thread publishes, the render worker reads.
+
+/// Publish the parameters that apply to the file whose encoded bytes hash to
+/// @p content_hash. Replaces any previous entry for the same hash.
+void SetActiveFoveonParams(std::uint64_t content_hash, const FoveonEditParams& params);
+
+/// Drop every published entry (image closed, or a session shutdown).
+void ClearActiveFoveonParams();
+
+/// Parameters for @p content_hash, or null when the file decodes through the
+/// plain path (no Foveon operators, no SPP).
+[[nodiscard]] auto ActiveFoveonParams(std::uint64_t content_hash)
+    -> std::optional<FoveonEditParams>;
+
+/// Cache-key variant for @p content_hash: 0 when no entry is published,
+/// otherwise the digest of everything that changes the scene-linear result.
+/// PreparedSourceCache folds this into its lookup key so a slider change is a
+/// miss and an exposure change is a hit.
+[[nodiscard]] auto ActiveFoveonVariant(std::uint64_t content_hash) -> std::uint64_t;
+
 }  // namespace alcedo::x3f
