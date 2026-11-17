@@ -8,9 +8,12 @@
 #include <QDeadlineTimer>
 #include <QDebug>
 #include <QEventLoop>
+#include <QFileInfo>
 #include <QMetaObject>
 #include <QPointer>
+#include <QProcess>
 #include <QQmlEngine>
+#include <QSettings>
 #include <QStringList>
 #include <QThread>
 #include <algorithm>
@@ -26,6 +29,7 @@
 
 #include "app/editor_adjustment_context.hpp"
 #include "app/editor_pending_input.hpp"
+#include "app/external_editor_bridge.hpp"
 #include "app/editor_session_bootstrap.hpp"
 #include "app/image_pool_service.hpp"
 #include "app/project_package_backend.hpp"
@@ -359,6 +363,8 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
       return {};
     }
   };
+  // Keep a copy for the companion-app handoff before foveon_path is moved into path B.
+  auto external_path = foveon_path;
   foveon_session_ =
       std::make_unique<FoveonSessionController>(std::move(foveon_path), this);
   RecordConstruction("FoveonSessionController", foveon_session_.get());
@@ -366,6 +372,11 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
           foveon_session_.get(), [this]() {
             if (editor_session_ && foveon_session_) {
               foveon_session_->SyncFromImageId(editor_session_->image_id());
+              // The Tone panel owns fill_light now. Mirror its document value
+              // into the decode params so X3F renders through the Retinex gain
+              // map; the Grade skips its own stand-in for the same frame.
+              foveon_session_->SyncFillLightFromDocument(
+                  editor_session_->adjustment_snapshot());
             }
           });
 
@@ -515,6 +526,45 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
   RecordConstruction("LutPreviewController", lut_preview_.get());
   workspace_router_ = std::make_unique<WorkspaceRouter>(editor_session_.get(), this);
   workspace_router_->SetInteractionPolicy(interaction_policy_.get());
+  // Thin bridge: hand X3F/X3I edits to the companion app. The executable and its extra
+  // arguments are user settings; the source path is always appended as the last argument.
+  workspace_router_->SetPathResolver(external_path);
+  workspace_router_->SetEditorLauncher([](const std::filesystem::path& source) -> bool {
+    QSettings settings;
+    // On macOS QSettings stores the '/' group separator as part of a flat key. `defaults
+    // write -dict-add`, however, produces a nested QVariantMap under "externalEditor".
+    // Accept both spellings so either configuration method works.
+    const auto read_setting = [&settings](const char* flat_key, const QString& group,
+                                          const QString& leaf) -> QString {
+      const QString flat = settings.value(QLatin1String(flat_key)).toString();
+      if (!flat.isEmpty()) {
+        return flat;
+      }
+      return settings.value(group).toMap().value(leaf).toString();
+    };
+    const QString app = read_setting(external_editor::kAppPathKey,
+                                     QStringLiteral("externalEditor"),
+                                     QStringLiteral("x3luminaAppPath"));
+    qWarning().noquote() << "[X3LuminaBridge] launcher invoked:"
+                         << "appPath=" << app
+                         << "exists=" << QFileInfo::exists(app)
+                         << "source=" << QString::fromStdWString(source.generic_wstring());
+    if (app.isEmpty()) {
+      return false;
+    }
+    QStringList args;
+    const QString extra = read_setting(external_editor::kArgsKey,
+                                       QStringLiteral("externalEditor"),
+                                       QStringLiteral("x3luminaArgs"));
+    if (!extra.isEmpty()) {
+      args = QProcess::splitCommand(extra);
+    }
+    args.append(QString::fromStdWString(source.generic_wstring()));
+    const bool started = QProcess::startDetached(app, args);
+    qWarning().noquote() << "[X3LuminaBridge] startDetached result=" << started
+                         << "args=" << args.join(QLatin1String(" "));
+    return started;
+  });
   RecordConstruction("WorkspaceRouter", workspace_router_.get());
   editor_behavior_ = std::make_unique<EditorBehaviorPreferences>(this);
   RecordConstruction("EditorBehaviorPreferences", editor_behavior_.get());

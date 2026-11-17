@@ -7,6 +7,10 @@
 #include <QObject>
 #include <QString>
 
+#include <cstdint>
+#include <filesystem>
+#include <functional>
+
 #include "ui/alcedo_main/album_backend/interaction_policy_controller.hpp"
 
 namespace alcedo::ui {
@@ -31,6 +35,15 @@ class WorkspaceRouter final : public QObject {
   /// The policy whose agent control refuses user image switches. Null refuses nothing.
   void             SetInteractionPolicy(InteractionPolicyController* interaction_policy);
 
+  /// Resolves an image id to its on-disk source path. Injected by ApplicationModuleHost so
+  /// this router, like FoveonSessionController, does not depend on the image-pool internals.
+  using PathResolver = std::function<std::filesystem::path(std::uint32_t)>;
+  /// Launches the companion editor for one source. Returns false when it is not configured,
+  /// so the ordinary editor route proceeds. Injected for testability.
+  using EditorLauncher = std::function<bool(const std::filesystem::path&)>;
+  void SetPathResolver(PathResolver resolver) { path_resolver_ = std::move(resolver); }
+  void SetEditorLauncher(EditorLauncher launcher) { editor_launcher_ = std::move(launcher); }
+
   Q_INVOKABLE void OpenLibrary();
   /// Shared route operation of the UI and the automation commands.
   Q_INVOKABLE void OpenEditor(uint elementId = 0, uint imageId = 0);
@@ -47,6 +60,8 @@ class WorkspaceRouter final : public QObject {
  private:
   EditorSessionController*     editor_session_     = nullptr;
   InteractionPolicyController* interaction_policy_ = nullptr;
+  PathResolver                 path_resolver_;
+  EditorLauncher               editor_launcher_;
   QString                  workspace_ = QStringLiteral("library");
   uint                     element_id_ = 0;
   uint                     image_id_ = 0;

@@ -16,6 +16,7 @@
 #include "ui/alcedo_main/automation/automation_control_commands.hpp"
 #include "ui/alcedo_main/automation/automation_curve_commands.hpp"
 #include "ui/alcedo_main/automation/automation_editor_commands.hpp"
+#include "ui/alcedo_main/automation/automation_external_commands.hpp"
 #include "ui/alcedo_main/automation/automation_export_commands.hpp"
 #include "ui/alcedo_main/automation/automation_film_commands.hpp"
 #include "ui/alcedo_main/automation/automation_host_commands.hpp"
@@ -174,7 +175,8 @@ auto AutomationHostSession::RegisterCommands(QString* error) -> bool {
          RegisterAutomationEditorCommands(registry_, host_, error) &&
          RegisterAutomationVersionCommands(registry_, host_, error) &&
          RegisterAutomationRenderCommands(registry_, host_, error) &&
-         RegisterAutomationAdjustmentCommands(registry_, host_, options_.host_mode, error);
+         RegisterAutomationAdjustmentCommands(registry_, host_, options_.host_mode, error) &&
+         RegisterAutomationExternalCommands(registry_, host_, error);
 }
 
 auto AutomationHostSession::WriteSessionFile(QString* error) -> bool {

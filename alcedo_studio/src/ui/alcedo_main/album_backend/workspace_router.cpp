@@ -6,6 +6,7 @@
 
 #include <QDebug>
 
+#include "app/external_editor_bridge.hpp"
 #include "ui/alcedo_main/album_backend/editor_session_controller.hpp"
 #include "utils/diagnostics/app_logging.hpp"
 
@@ -51,6 +52,33 @@ void WorkspaceRouter::OpenLibrary() {
 }
 
 void WorkspaceRouter::OpenEditor(uint elementId, uint imageId) {
+  // Thin bridge: X3F/X3I editing is owned by the companion app. Resolve the source from the
+  // image id and hand it off. When the launcher accepts, no editor workspace is opened, so the
+  // built-in Develop DAG never sees a Foveon source. When the companion app is not configured
+  // the launcher declines; the ordinary editor route then runs the product's existing X3F
+  // path (the wide-gamut Foveon chain, not the display-referred proxy), so the photo stays
+  // editable. That is configuration-not-enabled, not a degraded substitute for a failed path.
+  qWarning().noquote() << "[X3LuminaBridge] OpenEditor entered:"
+                       << "elementId=" << elementId << "imageId=" << imageId
+                       << "resolver=" << bool(path_resolver_)
+                       << "launcher=" << bool(editor_launcher_);
+  if (path_resolver_ && editor_launcher_ && imageId != 0) {
+    const auto source = path_resolver_(imageId);
+    qWarning().noquote() << "[X3LuminaBridge] resolved source:"
+                         << QString::fromStdWString(source.wstring())
+                         << "managed=" << external_editor::IsExternallyManaged(source);
+    if (external_editor::IsExternallyManaged(source)) {
+      if (editor_launcher_(source)) {
+        qCInfo(alcedo::diag::editorLog).noquote()
+            << "workspace.openEditor delegated to companion app:"
+            << QString::fromStdWString(source.wstring());
+        return;
+      }
+      qCInfo(alcedo::diag::editorLog).noquote()
+          << "workspace.openEditor companion app not configured; using built-in editor for:"
+          << QString::fromStdWString(source.wstring());
+    }
+  }
   workspace_  = QStringLiteral("editor");
   element_id_ = elementId;
   image_id_   = imageId;
