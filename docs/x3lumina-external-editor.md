@@ -196,3 +196,58 @@ These are the only Alcedo Studio files that know about the external editor:
 
 Keeping the bridge in these files means an Alcedo Studio upgrade only needs these small
 patches re-applied, not the full Foveon decode stack.
+
+## 5. Upgrading Alcedo Studio
+
+The bridge is a **source-level patch**, not an installed plugin. It survives an upgrade only
+if you keep building from your fork; replacing the app with an official pre-built binary
+drops the bridge, because that binary has none of these patches.
+
+What survives an upgrade untouched:
+
+- Handoff config — `externalEditor.*` in `com.alcedo-app.Alcedo.plist` (user scope). It is
+  tied to the bundle id, not the build; re-run the `defaults write` only if the bundle id
+  changes.
+- `.x3fproxy.jpg` sidecars — they live next to the photos, outside the app.
+- `X3Lumina.app` — a separate app with its own build/release cycle.
+
+What must be redone: re-apply the bridge and rebuild Studio once per upgrade.
+
+```sh
+cd /Users/daniellee/WorkBuddy/X3Lumina-Studio
+
+# 1. Fetch the official upstream
+git fetch upstream
+
+# 2. Sync your fork's main, then bring the work branch forward
+git checkout main
+git merge --ff-only upstream/main      # or merge if main has fork-only commits
+git push origin main
+git checkout feature/x3f-x3i-decoder
+git merge main                         # or: git rebase main
+
+# 3. Resolve conflicts only at the bridge touchpoints listed in the source map above
+#    (thumbnail_service.cpp, workspace_router.*, application_module_host.cpp,
+#     automation_host_session.cpp, CMakeLists.txt). The bridge is ~470 lines across 10 files.
+
+# 4. Rebuild Studio and redeploy your fork's build
+```
+
+To make re-application explicit (useful if a release branch is started from clean upstream),
+save the bridge as a patch and apply it with `git am`:
+
+```sh
+git format-patch -1 1ebb063 -o patches/
+git am patches/0001-feat-external-*.patch
+```
+
+Post-upgrade smoke check:
+
+```sh
+defaults read com.alcedo-app.Alcedo "externalEditor.x3luminaAppPath"
+alcedo-cli --json --session gui call session.ping '{}'
+```
+
+Then double-click one X3F/X3I to confirm handoff, and export a JPEG to confirm quit-after-export.
+If upstream changed the automation command schema, only `AlcedoHandoff.swift` (the CLI call
+sequence in §3b) needs adjusting — the source X3F/X3I and the wide-gamut pipeline are unaffected.
