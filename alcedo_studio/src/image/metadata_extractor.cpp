@@ -162,18 +162,10 @@ void MetadataExtractor::ExtractEXIF_ToImage(const image_path_t& image_path, Imag
       exclude(ImportFileCategory::Raw);
     }
 
-    // Bulk import must stay decode-free: the camera matrix comes from the
-    // header + CAMF metadata only, never from decompressed sensor planes.
-    // Develop resolves camera_to_AP1 exclusively from the document camera
-    // profile bound here; the decode-side PreparedRawInput context does NOT
-    // feed the render path, so a missing matrix would throw later.
-    const auto profile = x3f::ColorProfile(image_path);
-    if (!profile) {
-      // No Rec.709 fallback: that would reinterpret camera-native primaries as
-      // sRGB and narrow the gamut. Fail loudly instead.
-      throw MetadataExtractionError(ImportErrorCode::UNSUPPORTED_FORMAT, image_path,
-                                    "X3F/X3I has no usable camera colour matrix");
-    }
+    // Import is decode-free: identification and the embedded JPEG come from the
+    // header only. The camera matrix is intentionally not probed here — X3F/X3I
+    // editing is owned by the external companion app through the thin bridge,
+    // so the local Develop path never consumes a Foveon camera profile.
 
     // Most bodies carry a full-size embedded JPEG with the EXIF. The oldest
     // bodies (SD9/SD10) have no embedded JPEG at all; their capture metadata
@@ -188,39 +180,21 @@ void MetadataExtractor::ExtractEXIF_ToImage(const image_path_t& image_path, Imag
       }
     }
 
-    RawRuntimeColorContext ctx;
-    ctx.valid_                         = true;
-    ctx.output_in_camera_space_        = true;
-    ctx.camera_make_                   = "SIGMA";
-    ctx.cam_mul_[0] = ctx.cam_mul_[1] = ctx.cam_mul_[2] = 1.0f;
-    ctx.pre_mul_[0] = ctx.pre_mul_[1] = ctx.pre_mul_[2] = 1.0f;
-    // an X3F decodes through the Foveon native chain, which folds the calibrated
-    // camera->sRGB matrix and the camera white balance into the pixels and hands
-    // the DAG unclamped linear sRGB. The document profile must describe exactly
-    // that, or Develop would apply the sensor matrix a second time: DNG
-    // ColorMatrix is XYZ->camera and Develop inverts it, so "camera" here is
-    // linear sRGB and the neutral is unit RGB. No gamut is lost — out-of-sRGB
-    // colours survive as negative components because nothing clamps them.
-    constexpr double kSrgbToXyz[9] = {0.4124564, 0.3575761, 0.1804375,
-                                      0.2126729, 0.7151522, 0.0721750,
-                                      0.0193339, 0.1191920, 0.9503041};
-    constexpr double kXyzToSrgb[9] = {3.2404542, -1.5371385, -0.4985314,
-                                      -0.9692660, 1.8760108, 0.0415560,
-                                      0.0556434, -0.2040259, 1.0572252};
-    for (int i = 0; i < 9; ++i) {
-      ctx.cam_xyz_[i]        = static_cast<float>(kSrgbToXyz[i]);
-      ctx.color_matrix_1_[i] = kXyzToSrgb[i];
-      ctx.color_matrix_2_[i] = kXyzToSrgb[i];
+    // X3F/X3I editing is owned by the external companion app, whose sidecar
+    // JPEG (and the camera's embedded JPEG before that) is display-referred.
+    // Bind a raster document so thumbnails and the editor consume that JPEG
+    // through the raster path — no local RAW decode and no RawColorContext.
+    // The oldest bodies have no embedded JPEG; the standard sRGB fallback then
+    // supplies a complete (non-degenerate) description.
+    image.image_type_ = ImageType::JPEG;
+    if (!jpeg.empty()) {
+      image.SetRasterColorDescription(ResolveRasterColorDescription(
+          std::span<const std::byte>(reinterpret_cast<const std::byte*>(jpeg.data()),
+                                     jpeg.size()),
+          RasterFileKind::Jpeg));
+    } else {
+      image.SetRasterColorDescription(ResolveRasterColorDescription({}, RasterFileKind::Jpeg));
     }
-    ctx.color_matrices_valid_          = true;
-    ctx.calibration_illuminants_valid_ = false;
-    ctx.color_matrix_1_cct_            = 6504.0;
-    ctx.color_matrix_2_cct_            = 6504.0;
-    ctx.forward_matrices_valid_        = false;
-    ctx.as_shot_neutral_valid_         = true;
-    ctx.as_shot_neutral_[0] = ctx.as_shot_neutral_[1] = ctx.as_shot_neutral_[2] = 1.0;
-    // dng_profile_ intentionally stays an empty (unbound) reference.
-    image.SetRawColorContext(std::move(ctx));
     return;
   }
   // Not a Foveon container despite the extension: fall through to LibRaw.

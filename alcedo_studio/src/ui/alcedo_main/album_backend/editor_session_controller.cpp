@@ -2117,10 +2117,6 @@ auto EditorSessionController::NormalizeAdjustmentPanel(const QString& panel) -> 
   if (key == QLatin1String("raw") || key == QLatin1String("rawdecode")) {
     return QStringLiteral("raw");
   }
-  // Foveon native chain (path B). Without this key the panel snaps back to Tone.
-  if (key == QLatin1String("foveon") || key == QLatin1String("foveon_x3f")) {
-    return QStringLiteral("foveon");
-  }
   if (key == QLatin1String("masks") || key == QLatin1String("mask")) {
     return QStringLiteral("masks");
   }

@@ -111,10 +111,8 @@ def_library(EditInput
         ${ALCEDO_SRC_ROOT}/edit/input/raw_input_loader.cpp
         ${ALCEDO_SRC_ROOT}/edit/input/prepared_source_cache.cpp
         ${ALCEDO_SRC_ROOT}/edit/input/raster_input_loader.cpp
-        ${ALCEDO_SRC_ROOT}/edit/input/x3f_input_loader.cpp
     PUBLIC_DEPS EditGeometry JSON libraw::raw_r opencv_core Image
     PRIVATE_DEPS OpenImageIO::OpenImageIO libjpeg-turbo::turbojpeg lcms2::lcms2 Sha256Digest
-                 alcedo_x3f_support
 )
 
 # GPU-agnostic DAG runtime (parameter arena, texture LRU, KV cache). No CUDA headers.

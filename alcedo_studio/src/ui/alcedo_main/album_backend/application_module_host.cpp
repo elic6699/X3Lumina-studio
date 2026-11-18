@@ -345,10 +345,10 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
       std::make_unique<EditorSessionController>(editor_session_runtime_->service.get(), this);
   RecordConstruction("EditorSessionController", editor_session_.get());
 
-  // Path B: the Foveon native chain is an explicitly selected CPU sidecar. It
-  // resolves the current source file from the image pool but never writes to
-  // the editor session's Develop document or render cache.
-  auto foveon_path = [this](std::uint32_t image_id) -> std::filesystem::path {
+  // Resolve the current source file for the external companion-app handoff.
+  // X3F/X3I editing is owned by that app through the thin bridge; the main app
+  // only identifies/imports these files and never decodes their sensor planes.
+  auto external_path = [this](std::uint32_t image_id) -> std::filesystem::path {
     if (!project_ || !project_->handler().project()) {
       return {};
     }
@@ -365,22 +365,6 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
       return {};
     }
   };
-  // Keep a copy for the companion-app handoff before foveon_path is moved into path B.
-  auto external_path = foveon_path;
-  foveon_session_ =
-      std::make_unique<FoveonSessionController>(std::move(foveon_path), this);
-  RecordConstruction("FoveonSessionController", foveon_session_.get());
-  connect(editor_session_.get(), &EditorSessionController::StateChanged,
-          foveon_session_.get(), [this]() {
-            if (editor_session_ && foveon_session_) {
-              foveon_session_->SyncFromImageId(editor_session_->image_id());
-              // The Tone panel owns fill_light now. Mirror its document value
-              // into the decode params so X3F renders through the Retinex gain
-              // map; the Grade skips its own stand-in for the same frame.
-              foveon_session_->SyncFillLightFromDocument(
-                  editor_session_->adjustment_snapshot());
-            }
-          });
 
   editor_comparison_ = std::make_unique<EditorComparisonController>(
       editor_session_.get(), SharedComparisonImageStore(), this);
@@ -944,9 +928,6 @@ void ApplicationModuleHost::AttachQmlEngine(QQmlEngine* engine) {
                            new ComparisonImageProvider(SharedComparisonImageStore()));
   engine->addImageProvider(QString::fromUtf8(kLutPreviewImageProviderId),
                            new LutPreviewImageProvider(SharedLutPreviewImageStore()));
-  // Independent path-B preview overlay. QQmlEngine owns the provider.
-  engine->addImageProvider(QStringLiteral("foveon_preview"),
-                           new FoveonPreviewImageProvider(SharedFoveonPreviewStore()));
 
   if (library_ == nullptr) {
     return;

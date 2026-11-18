@@ -118,11 +118,13 @@ auto LoadX3fEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)
   const auto published = ActiveFoveonParams(hash);
   auto       params    = published.value_or(FoveonEditParams{});
   params.down = std::max(1, NativeDown(decode_res));
-  // Fill light moved to the Develop DAG (one Tone slider for every document, not
-  // just X3F): the LocalTone stage applies it after decoding. Leaving the decode
-  // copy on would apply it twice. Its calibration knobs stay in the panel but are
-  // inert while this is zero, which is what "moved" means.
-  params.fill_light = 0.0;
+  // Fill light keeps the Foveon Retinex path for X3F. ApplicationModuleHost
+  // mirrors the Tone panel's fill_light value into FoveonEditParams, so the
+  // decode-side gain map carries exactly the slider value. The Develop DAG's
+  // LLF stand-in is disabled for this frame via foveon_fill_light_baked below;
+  // the two paths are mutually exclusive and the slider is applied once.
+  // Every other input (JPEG/TIFF/Bayer) has no decode stage, so it keeps the
+  // Grade's universal fill light.
   // The frame itself is kept between calls: fill light, detail, sharpening,
   // highlight recovery, NR and SDQ highlight are all apply-level operators, so
   // dragging one re-runs the apply pass instead of decoding the mosaic again
@@ -180,6 +182,11 @@ auto LoadX3fEncoded(std::span<const std::byte> encoded, DecodeRes decode_res)
   // preview of a file ignore fill light).
   input.source_key.decode_variant =
       published ? FoveonLinearKey(params) : 0;
+  // Non-zero means the Retinex gain map was actually applied to `pixels`. The
+  // zero case leaves the Grade free to apply its own fill light (value 0 there
+  // too, so byte-identical), and keeps a stale published entry from blaming an
+  // un-baked frame on the Grade.
+  input.foveon_fill_light_baked = params.fill_light != 0.0;
   return input;
 }
 

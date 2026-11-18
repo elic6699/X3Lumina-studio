@@ -106,10 +106,14 @@ struct GradeScheduleInput {
  * @param bound Bound slots indexed like the compiled adjustment list.
  * @param mix Enabled mix in [0, 1]. Mix 0 aliases the input without GPU work.
  * @param has_mask When true, mix cannot be skipped even at mix 1.
+ * @param fill_light_baked When true the input already carries a decode-side
+ *        Foveon fill-light gain map, so the FillLight LLF stand-in is ignored.
+ *        Other inputs leave this false and keep the universal Grade fill light.
  */
 [[nodiscard]] auto MakeGradeSchedule(std::span<const CompiledGradeStage> stages,
                                      std::span<const GradeScheduleInput> bound, float mix,
-                                     bool has_mask) -> GradeSchedule;
+                                     bool has_mask, bool fill_light_baked = false)
+    -> GradeSchedule;
 
 /** @brief Record the comparable host decisions from @p schedule. */
 [[nodiscard]] auto MakeGradeDecisionTrace(const GradeSchedule& schedule) -> GradeDecisionTrace;
@@ -122,6 +126,7 @@ struct GradeScheduleInput {
  *
  * @tparam Backend ParameterArena backend.
  * @param error_prefix Thrown message prefix when compiled adjustments do not match the graph.
+ * @param fill_light_baked True when the prepared input already has decode-side fill light (X3F).
  * @return Compacted schedule. Caller uploads queued slot bytes after this returns.
  */
 template <class Backend>
@@ -129,7 +134,9 @@ template <class Backend>
                                         const ColorGradeNodeModel&    grade,
                                         const CompiledGradeNode&      compiled_grade,
                                         const ResolvedRenderGeometry& geometry,
-                                        std::string_view error_prefix) -> GradeSchedule {
+                                        std::string_view error_prefix,
+                                        bool             fill_light_baked = false)
+    -> GradeSchedule {
   auto Fail = [error_prefix](std::string_view detail) {
     throw std::runtime_error(std::string{error_prefix} + std::string{detail});
   };
@@ -191,7 +198,8 @@ template <class Backend>
 
   // Only visible Color Grades compile (GraphCompiler skips hidden ones).
   const float mix = grade.Mix();
-  return MakeGradeSchedule(compiled_grade.stages, bound, mix, compiled_grade.mask_stack.has_value());
+  return MakeGradeSchedule(compiled_grade.stages, bound, mix,
+                           compiled_grade.mask_stack.has_value(), fill_light_baked);
 }
 
 }  // namespace alcedo

@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -60,44 +59,11 @@ struct ProbeInfo {
 [[nodiscard]] auto MaterializeFrame(const std::filesystem::path& path, int frame = -1)
     -> std::vector<uint8_t>;
 
-/// Sniffs the X3F/X3I magic on an opaque encoded buffer. The decode cache hands
-/// LoadEncodedImage bytes, not a path, so the format branch must be content-based.
-[[nodiscard]] auto IsX3fEncoded(std::span<const std::byte> encoded) -> bool;
-
-/// Camera-native colour description. Both matrices are row-major 3x3:
-///   cam_to_xyz : camera BMT linear -> XYZ (D65)
-///   xyz_to_cam : its exact inverse (DNG ColorMatrix convention, XYZ -> camera)
-/// The decoder emits exactly these together with its scene-linear pixels, so
-/// import and render always agree on the same source primaries.
-struct X3fColorProfile {
-  double cam_to_xyz[9]{};
-  double xyz_to_cam[9]{};
-  int    model_class  = 0;
-  int    decoder_used = 0;
-};
-
-/// Resolves the colour matrix of a source file without keeping the pixels.
-/// Results are cached per (path, frame, size, mtime). A miss decodes one frame
-/// and frees the pixels immediately; see the implementation note on import cost.
-[[nodiscard]] auto ColorProfile(const std::filesystem::path& path, int frame = -1)
-    -> std::optional<X3fColorProfile>;
-
-/// One decoded camera-native scene-linear frame. rgb is width*height*3 floats,
-/// RGB interleaved, with negative channels and >1 headroom preserved (no clamp).
-struct X3fLinearFrame {
-  std::shared_ptr<const float> rgb;
-  int                          width        = 0;
-  int                          height       = 0;
-  int                          orientation  = 0;
-  int                          decoder_used = 0;
-  int                          model_class  = 0;
-  X3fColorProfile              profile{};
-};
-
-/// Decodes an in-memory standalone X3F frame (FOVb). `decoder` is one of the
-/// X3F_ALCEDO_DECODER_* values; 0 (AUTO) selects own for Quattro, fuse otherwise.
-/// SPP is rejected: it is a finished-image sidecar, not a scene-linear source.
-[[nodiscard]] auto DecodeEncoded(std::span<const std::byte> encoded, int decoder = 0)
-    -> std::optional<X3fLinearFrame>;
+// Import-only support. X3F/X3I files are identified, probed and their embedded
+// preview JPEG read here — no sensor-plane decoding happens in the main app.
+// Editing is owned by the external companion app through the thin bridge, so
+// the colour-matrix probe and in-memory decode bridge are intentionally absent
+// from this header (they live with the decode sources, which are not built into
+// the application).
 
 }  // namespace alcedo::x3f

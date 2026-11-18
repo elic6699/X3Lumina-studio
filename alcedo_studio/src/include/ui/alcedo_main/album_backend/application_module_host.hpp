@@ -33,7 +33,6 @@ class QQmlEngine;
 #include "ui/alcedo_main/album_backend/editor_comparison_controller.hpp"
 #include "ui/alcedo_main/album_backend/editor_session_controller.hpp"
 #include "ui/alcedo_main/album_backend/editor_session_render_scheduler_port.hpp"
-#include "ui/alcedo_main/album_backend/foveon_session_controller.hpp"
 #include "ui/alcedo_main/album_backend/export_queue.hpp"
 #include "ui/alcedo_main/album_backend/export_recipe_builder.hpp"
 #include "ui/alcedo_main/album_backend/folder_controller.hpp"
@@ -96,9 +95,6 @@ class ApplicationModuleHost final : public QObject {
       alcedo::AiProviderProfileController* aiProviderProfiles READ ai_provider_profiles CONSTANT)
   Q_PROPERTY(AdjustmentTransferController* adjustmentTransfer READ adjustment_transfer CONSTANT)
   Q_PROPERTY(EditorSessionController* editorSession READ editor_session CONSTANT)
-  /// Path B: the explicitly selected Foveon native-chain preview / adjustment
-  /// state. Independent of editorSession's wide-gamut Develop DAG (path A).
-  Q_PROPERTY(FoveonSessionController* foveonSession READ foveon_session CONSTANT)
   /// The editor comparison of the open image (Compare actions, panel, and view).
   Q_PROPERTY(EditorComparisonController* editorComparison READ editor_comparison CONSTANT)
   /// The AI Mask tool of the open image (SM9 MVP).
@@ -188,9 +184,6 @@ class ApplicationModuleHost final : public QObject {
   }
 
   [[nodiscard]] auto editor_session() -> EditorSessionController* { return editor_session_.get(); }
-  [[nodiscard]] auto foveon_session() -> FoveonSessionController* {
-    return foveon_session_.get();
-  }
   [[nodiscard]] auto editor_comparison() -> EditorComparisonController* {
     return editor_comparison_.get();
   }
@@ -286,7 +279,6 @@ class ApplicationModuleHost final : public QObject {
   std::unique_ptr<alcedo::EditorSessionRuntime>        editor_session_runtime_;
   std::shared_ptr<EditorSessionRenderSchedulerPort>    editor_session_scheduler_;
   std::unique_ptr<EditorSessionController>             editor_session_;
-  std::unique_ptr<FoveonSessionController>             foveon_session_;
   std::unique_ptr<EditorComparisonController>          editor_comparison_;
   std::unique_ptr<EditorAiMaskTool>                    ai_mask_tool_;
   std::unique_ptr<LutLibraryModel>                     lut_browser_;

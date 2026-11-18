@@ -4,17 +4,13 @@
 
 #include "decoders/x3f/x3f_support.hpp"
 
-#include <x3f_alcedo_export.h>
 #include <x3fcore.h>
 
 #include <algorithm>
-#include <array>
 #include <cctype>
-#include <cmath>
-#include <cstdlib>
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
-#include <map>
-#include <mutex>
 
 namespace alcedo::x3f {
 namespace {
@@ -31,49 +27,6 @@ auto LowerAscii(std::string value) -> std::string {
   return value;
 }
 
-/// Adjugate/determinant inverse. A degenerate matrix would collapse the gamut,
-/// so callers must fail rather than silently keep a wide-gamut label.
-auto Invert3x3(const double m[9], double out[9]) -> bool {
-  const double a = m[0], b = m[1], c = m[2];
-  const double d = m[3], e = m[4], f = m[5];
-  const double g = m[6], h = m[7], i = m[8];
-  const double A = e * i - f * h;
-  const double B = f * g - d * i;
-  const double C = d * h - e * g;
-  const double det = a * A + b * B + c * C;
-  if (!(std::abs(det) > 1e-12) || !std::isfinite(det)) {
-    return false;
-  }
-  const double t[9] = {A / det, (c * h - b * i) / det, (b * f - c * e) / det,
-                       B / det, (a * i - c * g) / det, (c * d - a * f) / det,
-                       C / det, (b * g - a * h) / det, (a * e - b * d) / det};
-  std::memcpy(out, t, sizeof(t));
-  return true;
-}
-
-auto ProfileFrom(const x3f_alcedo_linear_t& decoded) -> std::optional<X3fColorProfile> {
-  X3fColorProfile profile;
-  std::memcpy(profile.cam_to_xyz, decoded.cam_xyz, sizeof(profile.cam_to_xyz));
-  if (!Invert3x3(profile.cam_to_xyz, profile.xyz_to_cam)) {
-    return std::nullopt;
-  }
-  profile.model_class  = decoded.model_class;
-  profile.decoder_used = decoded.decoder_used;
-  return profile;
-}
-
-/// The decoder's override is a process global; both probe and render serialize
-/// on the C-side mutex, so a shared import cache can be a plain map + lock.
-struct ColorProfileCache {
-  std::mutex                            mutex;
-  std::map<std::string, X3fColorProfile> entries;
-};
-
-auto SharedColorProfileCache() -> ColorProfileCache& {
-  static ColorProfileCache cache;
-  return cache;
-}
-
 auto Read16(const std::uint8_t* p, bool little) -> std::uint16_t {
   return little ? static_cast<std::uint16_t>(p[0] | (p[1] << 8))
                 : static_cast<std::uint16_t>((p[0] << 8) | p[1]);
@@ -86,16 +39,6 @@ auto Read32(const std::uint8_t* p, bool little) -> std::uint32_t {
                 : ((static_cast<std::uint32_t>(p[0]) << 24) |
                    (static_cast<std::uint32_t>(p[1]) << 16) |
                    (static_cast<std::uint32_t>(p[2]) << 8) | p[3]);
-}
-
-auto ColorProfileKey(const std::filesystem::path& path, int frame) -> std::string {
-  std::error_code ec;
-  const auto      size = std::filesystem::file_size(path, ec);
-  const auto      time = std::filesystem::last_write_time(path, ec);
-  return PathText(path) + "|" + std::to_string(frame) + "|" +
-         (ec ? "na" : std::to_string(static_cast<std::uint64_t>(size))) + "|" +
-         (ec ? "na"
-             : std::to_string(static_cast<std::int64_t>(time.time_since_epoch().count())));
 }
 
 /// x3fcore returns malloc-owned buffers; never let one leak on an error path.
@@ -222,6 +165,30 @@ auto EmbeddedJpegOrientation(std::span<const std::uint8_t> jpeg) -> int {
   return 1;
 }
 
+/// Reads the rotation word at header offset 36. Mirrors the decode layer's
+/// x3f_alcedo_header_orientation so import stays independent of the render core.
+auto HeaderOrientation(const std::filesystem::path& path) -> int {
+  FILE* f = std::fopen(PathText(path).c_str(), "rb");
+  if (f == nullptr) {
+    return 1;
+  }
+  std::uint8_t b[40] = {0};
+  const auto   n = std::fread(b, 1, sizeof(b), f);
+  std::fclose(f);
+  if (n < 40 || std::memcmp(b, "FOVb", 4) != 0) {
+    return 1;
+  }
+  if (Read32(b + 4, true) >= 0x00040000u) {
+    return 1;  // v4+ Quattro headers do not carry the rotation word
+  }
+  switch (Read32(b + 36, true)) {
+    case 90:  return 6;
+    case 180: return 3;
+    case 270: return 8;
+    default:  return 1;
+  }
+}
+
 auto ResolveOrientation(const std::filesystem::path& path, int exif_orientation) -> int {
   if (exif_orientation < 1 || exif_orientation > 8) {
     return 1;
@@ -229,86 +196,7 @@ auto ResolveOrientation(const std::filesystem::path& path, int exif_orientation)
   if (exif_orientation != 1) {
     return exif_orientation;  // Merrill+ dual-write: EXIF is authoritative
   }
-  return x3f_alcedo_header_orientation(PathText(path).c_str());
-}
-
-auto IsX3fEncoded(std::span<const std::byte> encoded) -> bool {
-  if (encoded.size() < 4) {
-    return false;
-  }
-  const auto* head = reinterpret_cast<const char*>(encoded.data());
-  return std::memcmp(head, "FOVb", 4) == 0 || std::memcmp(head, "FOVi", 4) == 0;
-}
-
-auto ColorProfile(const std::filesystem::path& path, int frame)
-    -> std::optional<X3fColorProfile> {
-  const auto key = ColorProfileKey(path, frame);
-  {
-    auto&                 cache = SharedColorProfileCache();
-    const std::lock_guard lock(cache.mutex);
-    if (const auto it = cache.entries.find(key); it != cache.entries.end()) {
-      return it->second;
-    }
-  }
-
-  // Decode-free: bulk import must never decompress the sensor planes. This
-  // reads only the header, trailing directory and CAMF metadata (~3 MB).
-  // x3f_alcedo_export_linear uses the very same matrix for its pixels, so the
-  // document camera profile and the rendered scene-linear data stay paired.
-  const auto          text = PathText(path);
-  x3f_alcedo_linear_t decoded{};
-  const int           rc = x3f_alcedo_probe_color(text.c_str(), frame, decoded.cam_xyz);
-  if (rc != X3F_ALCEDO_OK) {
-    return std::nullopt;
-  }
-  decoded.model_class = x3f_alcedo_model_class(text.c_str());
-  auto profile        = ProfileFrom(decoded);
-  if (!profile) {
-    return std::nullopt;
-  }
-
-  auto&                 cache = SharedColorProfileCache();
-  const std::lock_guard lock(cache.mutex);
-  // Import walks a library sequentially; a bounded cache avoids unbounded growth.
-  if (cache.entries.size() >= 512) {
-    cache.entries.clear();
-  }
-  cache.entries.emplace(key, *profile);
-  return profile;
-}
-
-auto DecodeEncoded(std::span<const std::byte> encoded, int decoder)
-    -> std::optional<X3fLinearFrame> {
-  if (!IsX3fEncoded(encoded)) {
-    return std::nullopt;
-  }
-  x3f_alcedo_linear_t decoded{};
-  const int rc = x3f_alcedo_export_linear_memory(encoded.data(), encoded.size(), decoder,
-                                                 &decoded);
-  if (rc != X3F_ALCEDO_OK || decoded.rgb == nullptr || decoded.width <= 0 ||
-      decoded.height <= 0) {
-    x3f_alcedo_export_free(&decoded);
-    return std::nullopt;
-  }
-  auto profile = ProfileFrom(decoded);
-  if (!profile) {
-    x3f_alcedo_export_free(&decoded);
-    return std::nullopt;
-  }
-
-  X3fLinearFrame frame;
-  frame.width        = decoded.width;
-  frame.height       = decoded.height;
-  frame.orientation  = decoded.orientation;
-  frame.decoder_used = decoded.decoder_used;
-  frame.model_class  = decoded.model_class;
-  frame.profile      = *profile;
-  // Both backends allocate with libc malloc. Take ownership instead of copying
-  // ~200 MB of full-resolution pixels, and never clamp on the way out.
-  frame.rgb = std::shared_ptr<const float>(decoded.rgb, [](const float* p) {
-    std::free(const_cast<float*>(p));
-  });
-  return frame;
+  return HeaderOrientation(path);
 }
 
 }  // namespace alcedo::x3f

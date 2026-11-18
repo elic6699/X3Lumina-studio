@@ -486,6 +486,24 @@ void FoveonSessionController::SetParam(QString key, QVariant value) {
   }
 }
 
+void FoveonSessionController::SyncFillLightFromDocument(const QVariantMap& snapshot) {
+  if (!available_ || content_hash_ == 0) {
+    return;
+  }
+  const auto it = snapshot.constFind(QStringLiteral("fill_light"));
+  if (it == snapshot.constEnd()) {
+    return;
+  }
+  bool   ok    = false;
+  double value = it->toDouble(&ok);
+  if (!ok || params_.fill_light == value) {
+    return;
+  }
+  params_.fill_light = value;
+  emit ParametersChanged();
+  PublishDecodeParams();
+}
+
 void FoveonSessionController::ResetParams() {
   params_ = FoveonEditParams{};
   status_ = QStringLiteral("Product defaults (three highlight fixes ON)");

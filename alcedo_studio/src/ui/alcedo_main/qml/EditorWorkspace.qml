@@ -260,39 +260,6 @@ Item {
                         }
                     }
 
-                    // Path B preview: an independent 8-bit view of the 16-bit sRGB
-                    // finished image from the Foveon native chain. It sits above
-                    // the RHI viewport (z 0) and below the interaction overlay
-                    // (z 2). Path A's GPU DAG and document stay untouched.
-                    Image {
-                        id: foveonPreviewOverlay
-                        objectName: "foveonPreviewOverlay"
-                        anchors.centerIn: parent
-                        width: viewportSlot.stageWidth
-                        height: viewportSlot.stageHeight
-                        scale: viewportSlot.stageScale
-                        fillMode: Image.PreserveAspectFit
-                        asynchronous: true
-                        cache: false
-                        z: 1
-                        // Presentation only. An Item still becomes the target for
-                        // native gesture events (macOS pinch) even when it has no
-                        // handlers, which swallowed two-finger zoom while this
-                        // overlay was on screen. Disabling input makes the
-                        // viewport below keep the gesture.
-                        enabled: false
-                        readonly property bool active: root.hasImage
-                            && appModules.foveonSession
-                            && (appModules.foveonSession.enabled
-                                || appModules.foveonSession.sppMode)
-                            && appModules.foveonSession.available
-                        visible: active
-                        source: active
-                                ? "image://foveon_preview/"
-                                  + appModules.foveonSession.previewRevision
-                                : ""
-                    }
-
                     EditorOverlayItem {
                         id: editorOverlayItem
                         objectName: "editorOverlayItem"

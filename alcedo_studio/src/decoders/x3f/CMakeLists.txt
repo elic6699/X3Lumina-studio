@@ -181,17 +181,35 @@ else()
   set(X3F_HOST_INCLUDE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 endif()
 
-add_library(alcedo_x3f_support STATIC
-    x3f_support.cpp
-    x3f_foveon.cpp)
-target_include_directories(alcedo_x3f_support PUBLIC
+# Import-only support: file identification, header probe, embedded-JPEG read
+# and X3I frame materialization. It touches only the file-header layer in
+# alcedo_x3fcore — no sensor-plane decode, no RAW render, no Rust x3fuse. This
+# is the sole X3F target built into the application; the decode bridge below is
+# kept in-tree for local experiments but is not linked by the product.
+add_library(alcedo_x3f_import STATIC
+    x3f_support.cpp)
+target_include_directories(alcedo_x3f_import PUBLIC
     "${X3F_HOST_INCLUDE_ROOT}" "${X3F_CORE_INC}")
-# The C++ support layer now also owns the scene-linear decode bridge (colour
-# matrix probe + in-memory frame decode), so it needs the full decode core.
-target_link_libraries(alcedo_x3f_support PUBLIC alcedo_x3fcore alcedo_x3fraw)
-target_compile_features(alcedo_x3f_support PUBLIC cxx_std_20)
-set_target_properties(alcedo_x3f_support PROPERTIES
+target_link_libraries(alcedo_x3f_import PUBLIC alcedo_x3fcore)
+target_compile_features(alcedo_x3f_import PUBLIC cxx_std_20)
+set_target_properties(alcedo_x3f_import PROPERTIES
     AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+
+# Decode bridge (path B): kept in the repository for local use but NOT built
+# into the application. X3F/X3I editing is owned by the external companion app.
+# It still references the colour-matrix probe and scene-linear decode, which
+# live in the render core, so it is compiled only in standalone smoke builds.
+if(ALCEDO_X3F_TOP_LEVEL)
+  add_library(alcedo_x3f_support STATIC
+      x3f_support.cpp
+      x3f_foveon.cpp)
+  target_include_directories(alcedo_x3f_support PUBLIC
+      "${X3F_HOST_INCLUDE_ROOT}" "${X3F_CORE_INC}")
+  target_link_libraries(alcedo_x3f_support PUBLIC alcedo_x3fcore alcedo_x3fraw)
+  target_compile_features(alcedo_x3f_support PUBLIC cxx_std_20)
+  set_target_properties(alcedo_x3f_support PROPERTIES
+      AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+endif()
 
 # ---------------------------------------------------------------------------
 # Smoke tools (only when this directory is the top-level project)

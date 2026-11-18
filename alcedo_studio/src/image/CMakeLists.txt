@@ -109,7 +109,7 @@ def_library(Image
 # so that a target that links both gRPC and Image has one zlib.
 target_link_libraries(Image PRIVATE OpenImageIO::OpenImageIO lcms2::lcms2
     $<IF:$<TARGET_EXISTS:zlibstatic>,zlibstatic,ZLIB::ZLIB> Sha256Digest
-    alcedo_x3f_support)
+    alcedo_x3f_import)
 
 # Image Pool
 def_library(ImagePool

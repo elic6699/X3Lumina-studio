@@ -25,6 +25,7 @@
 #include "app/batch_executor_pool.hpp"
 #include "app/external_editor_bridge.hpp"
 #include "app/pipeline_service.hpp"
+#include "decoders/x3f/x3f_support.hpp"
 #include "app/thumbnail_disk_cache_service.hpp"
 #include "concurrency/thread_pool.hpp"
 #include "edit/input/raster_input_loader.hpp"
@@ -467,13 +468,24 @@ void ThumbnailService::State::DecodeRenditionSource(
       // and materializing one frame just to discard it would be wasteful.
       const auto source_path = image->image_path_;
       std::vector<std::uint8_t> proxy;
-      const bool use_proxy = external_editor::IsExternallyManaged(source_path) &&
+      const bool externally_managed = external_editor::IsExternallyManaged(source_path);
+      const bool use_proxy = externally_managed &&
                              external_editor::TryReadProxyJpeg(source_path, &proxy);
       std::shared_ptr<const PreparedRawInput> source;
       {
-        auto encoded = use_proxy
-                           ? std::move(proxy)
-                           : ByteBufferLoader::LoadByteBufferFromImage(std::move(image));
+        std::vector<std::uint8_t> encoded;
+        if (use_proxy) {
+          encoded = std::move(proxy);
+        } else if (externally_managed) {
+          // No companion-app sidecar yet (fresh import): use the camera's own
+          // full-size embedded JPEG. This is import/display data only — the
+          // sensor planes are never decoded here, and no colour matrix is
+          // needed because the JPEG is already display-referred sRGB.
+          encoded = x3f::ReadEmbeddedJpeg(source_path);
+        }
+        if (encoded.empty()) {
+          encoded = ByteBufferLoader::LoadByteBufferFromImage(std::move(image));
+        }
         if (request->IsCanceled()) {
           request->Fail(ThumbnailRequestStatus::kCanceled, "Request was canceled.");
           return;

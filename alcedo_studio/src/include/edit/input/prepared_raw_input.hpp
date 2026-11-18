@@ -215,6 +215,12 @@ struct PreparedRawInput {
   bool                                     raster_lut_icc_converted = false;
   std::string                              raster_icc_sha256;
 
+  /// X3F only: the Foveon Retinex fill-light gain map was baked into this plane
+  /// at decode time. When true the Grade must skip its LLF fill-light stand-in
+  /// so the slider is not applied twice. False for every other input, so JPEG,
+  /// TIFF and Bayer documents keep the universal Grade fill light.
+  bool                                     foveon_fill_light_baked = false;
+
   [[nodiscard]] auto                       CompileSource() const -> DevelopCompileSource;
 };
 

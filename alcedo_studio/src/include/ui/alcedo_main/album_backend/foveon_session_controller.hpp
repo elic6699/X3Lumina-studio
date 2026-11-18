@@ -151,6 +151,10 @@ class FoveonSessionController final : public QObject {
   void SetSourcePath(QString path);
   void setEnabled(bool on);
   void SetParam(QString key, QVariant value);
+  /// Mirror the Tone panel's fill_light value from the document snapshot into
+  /// the decode-side Foveon parameters, so X3F keeps the Retinex look while the
+  /// Grade skips its LLF stand-in for this frame.
+  void SyncFillLightFromDocument(const QVariantMap& snapshot);
   void ResetParams();
   void LoadSidecar();
   void SaveSidecar();

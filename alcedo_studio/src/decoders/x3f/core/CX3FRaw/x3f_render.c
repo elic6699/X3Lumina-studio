@@ -14403,110 +14403,6 @@ static void apply_hf_soften(void *vout, int w, int h, int stride, int bits)
     free(jb.Y); free(jb.tmp); free(jb.blur);
 }
 
-/* 线性域的「SDQ 高光收色」—— 把 X3Lumina 的**显示域公式**原样搬到
- * look_defer 的出口（apply_row / apply_common 的显示域阶段在 defer 下整段不跑，
- * 所以 sdq_hl 在 Develop DAG 的馈送里原本一个像素也动不了）。
- *
- * 判据与权重完全照抄原版（x3f_render.c 的 hl_desat + sdq_neut_w，
- * Views.swift 的 SDQ 高光滑杆）：
- *
- *     Y 够高（显示 Y ≥ 0.58 起、0.84 全量）
- *     且不是浓彩色（显示色差 dmx−dmn < 0.40 起收、0.55 以上排除）
- *     两路取并集：上面这条显示判据，加上 RAW 饱和分那条（clip 0.40→1.20 渐入，
- *     与显示亮度无关 —— 原版 hl_desat 的主路，两个通道顶到饱和就收）
- *     目标 = 显示 Y；判「确定是白」时改用最亮通道（否则只停在 B 掉下来那档）
- *
- * 唯一的改写是"显示值"的来源：defer 出口还没有 tone 曲线，于是用
- *     e = srgb_encode(clamp(lin / X3F_OE_LIN_WHITE, 0, 1))
- * 当显示域的代理 —— X3F_OE_LIN_WHITE 就是传感器饱和（= 出图白点），所以
- * e 与 16 位出口的码值同量级同形状。**上一版把判据直接算在场景线性上，
- * 色差门槛 0.40/0.55 是显示域的数：线性域里一个 (233,228,170) 的淡黄相对
- * 色差就有 0.5，于是被"浓彩色"项全部挡掉 —— 那正是滑杆"怎么拖都没反应"的
- * 原因。**
- *
- * 落回线性时朝"同显示亮度的中性值"插值：w=1 时三通道严格相等（真收白），
- * 通道值不低于 0，也不引入任何裁剪 —— 关掉滑杆（w=0）逐位等于原输出，
- * 广色域的原生数据照旧。
- *
- * 只对 SDQ/SDQH 生效（DigitalISOGain != 1）；滑杆 0 时整块不进。 */
-static void sdq_linear_desat(float *out, const float *clip, int w, int h,
-                             int stride, double strength)
-{
-    const double kWhite = X3F_OE_LIN_WHITE;  /* 传感器饱和 = 出图白点 */
-    int          y;
-
-    if (out == NULL || w <= 0 || h <= 0 || strength <= 0.0) return;
-    if (strength > 2.0) strength = 2.0;
-
-    for (y = 0; y < h; y++) {
-        float *d = (float *)((char *)out + (size_t)y * (size_t)stride);
-        const float *c = clip ? clip + (size_t)y * (size_t)w : NULL;
-        int x;
-        for (x = 0; x < w; x++) {
-            float *px = d + (size_t)x * 3;
-            double r = px[0], g = px[1], b = px[2];
-            double yl = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            double e0, e1, e2, dmn, dmx, ye, wd, ww, wc, cs, t, mx_lin;
-            int k;
-
-            /* ① RAW 饱和分那一路（原版的主路）：两个通道顶到传感器上限就
-             * 说明这个高光的颜色不可信，按饱和分在 0.40~1.20 之间渐入收色，
-             * 与显示亮度无关 —— 所以压曝光把层次拉出来以后它照样在。门槛与
-             * 原版 X3F_HL_DESAT_CLIP_LO/HI 一致。 */
-            cs = (c != NULL) ? (double)c[x] : -1.0;
-            wc = (cs >= 0.0) ? sstep01(X3F_HL_DESAT_CLIP_LO,
-                                       X3F_HL_DESAT_CLIP_HI, cs) * strength : 0.0;
-            if (wc > 1.0) wc = 1.0;
-
-            /* ② 显示域判据那一路只在显示亮度够高时才可能非零（Y 0.58 起，
-             * s > 1 时门槛下移到 0.48）。两路都够不到就直接跳过，省掉 pow。 */
-            if (yl < 0.24 && wc <= 0.001) continue;
-
-            e0 = srgb_encode(r / kWhite > 1.0 ? 1.0 : (r > 0.0 ? r / kWhite : 0.0));
-            e1 = srgb_encode(g / kWhite > 1.0 ? 1.0 : (g > 0.0 ? g / kWhite : 0.0));
-            e2 = srgb_encode(b / kWhite > 1.0 ? 1.0 : (b > 0.0 ? b / kWhite : 0.0));
-
-            dmn = dmx = e0;
-            if (e1 < dmn) dmn = e1;
-            if (e1 > dmx) dmx = e1;
-            if (e2 < dmn) dmn = e2;
-            if (e2 > dmx) dmx = e2;
-
-            ye = 0.2126 * e0 + 0.7152 * e1 + 0.0722 * e2;
-            wd = sdq_weight_at(ye, dmx - dmn, strength);
-
-            ww = (wc > wd) ? wc : wd;
-            if (ww <= 0.001) continue;
-
-            mx_lin = r > g ? r : g;
-            if (b > mx_lin) mx_lin = b;
-
-            /* 目标用**本像素自己的线性值**算，绝不先夹到白点再换回来：
-             * 火花这类过曝点的线性值可以到 5 以上，夹到 1.4 当目标就会把它们
-             * 从 5 压到 1.4，同一块反光里邻居没被夹 —— 白斑里就长出一片黑点
-             * （2026-11-16 用户报障）。
-             *
-             * 两条权重来源给不同目标：
-             *   · RAW 饱和分驱动（一个通道已顶到传感器上限）→ 目标就是**这个
-             *     像素最亮的通道**。饱和像素的颜色本身不可信（那正是滑杆要修
-             *     的东西），而它的"亮"必须保住：拿线性亮度当目标时，洋红火花
-             *     (0.78, 0.39, 1.09) 的亮度只有 0.52 —— 白点阵里就落下一颗
-             *     灰点。往最亮通道拉只会把其余通道抬上去，绝不压暗。
-             *   · 显示域窗口驱动（没饱和的淡黄）→ 照原版取显示亮度，判「确定
-             *     是白」(wd > 0.5) 时同样改用最亮通道。 */
-            if (wc > wd) {
-                t = mx_lin;
-            } else {
-                t = yl;
-                if (t < 0.0) t = 0.0;
-                if (wd > 0.5 && mx_lin > t) t = mx_lin;
-            }
-
-            for (k = 0; k < 3; k++) px[k] = (float)(px[k] + (t - px[k]) * ww);
-        }
-    }
-}
-
 static int apply_ex_common(const x3f_edit_params_t *p,
                            const float *lin, const float *clip,
                            int w, int h, void *out, int stride, int bits)
@@ -15595,13 +15491,11 @@ static int apply_ex_common(const x3f_edit_params_t *p,
         APPLY_TAP("chrshlp");
     }
 
-    /* 观感延后：到这里 out 已经是线性 sRGB 码值，显示域后处理一律不做。 */
+    /* 观感延后：到这里 out 已经是线性 sRGB 码值，显示域后处理一律不做。
+     * SDQ 高光是显示域算子（原版在 apply_common 的显示域阶段做，值恒在
+     * [0,1]），线性馈送里没有显示域可用，因此这里**不**收色 —— 在线性域
+     * 硬做会把过曝点拉成 (2,2,2) 这种中性超白，进 Develop DAG 后出现黑点。 */
     if (look_defer) {
-        /* SDQ 高光在线性馈送里没有显示域可用，改用 RAW 饱和分掩膜收色
-         * （见 sdq_linear_desat）。只在 32 位 float 出口做，16 位那条
-         * look_defer 出口维持原样。 */
-        if (bits == 32 && g_sdq_hl > 0.0 && sdq_dig_active())
-            sdq_linear_desat((float *)out, clip, w, h, stride, g_sdq_hl);
         return X3FRENDER_OK;
     }
 

@@ -85,7 +85,6 @@ class GradeExecutor {
                       const PipelineDocument& document, const CompiledGradeNode& compiled_grade,
                       const FrameSceneBinding&   scene,
                       CurveInputHistogramRecord* histogram = nullptr) -> GradeExecutionResult {
-    (void)prepared;
     auto& workspace = device.Workspace();
     if (!workspace.IsRendering()) {
       throw std::runtime_error(std::string{Ops::kErrorPrefix} + ": BeginRender has not been called");
@@ -111,8 +110,8 @@ class GradeExecutor {
     }
     arena.Reserve(slot_bytes);
 
-    auto schedule =
-        BindAndScheduleGrade(arena, *grade, compiled_grade, plan.geometry, Ops::kErrorPrefix);
+    auto schedule = BindAndScheduleGrade(arena, *grade, compiled_grade, plan.geometry,
+                                         Ops::kErrorPrefix, prepared.foveon_fill_light_baked);
     result.trace = MakeGradeDecisionTrace(schedule);
     if (schedule.alias_to_input && histogram == nullptr) {
       diag::PreviewPerformance::SetPassState(diag::PreviewExecutionState::Aliased);

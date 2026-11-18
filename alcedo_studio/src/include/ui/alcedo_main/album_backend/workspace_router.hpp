@@ -36,7 +36,7 @@ class WorkspaceRouter final : public QObject {
   void             SetInteractionPolicy(InteractionPolicyController* interaction_policy);
 
   /// Resolves an image id to its on-disk source path. Injected by ApplicationModuleHost so
-  /// this router, like FoveonSessionController, does not depend on the image-pool internals.
+  /// this router does not depend on the image-pool internals.
   using PathResolver = std::function<std::filesystem::path(std::uint32_t)>;
   /// Launches the companion editor for one source. Returns false when it is not configured,
   /// so the ordinary editor route proceeds. Injected for testability.

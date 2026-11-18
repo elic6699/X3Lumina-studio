@@ -9,7 +9,6 @@
 
 #include "edit/input/raster_input_loader.hpp"
 
-#include "decoders/x3f/x3f_foveon.hpp"
 
 namespace alcedo {
 namespace {
@@ -116,10 +115,6 @@ auto PreparedSourceCache::AcquireEncoded(std::span<const std::byte> encoded, Dec
   PreparedSourceLookup lookup{
       HashEncoded(encoded), encoded.size(), DecodeResToDownsamplePasses(decode_res),
       kRawInputPreparationVersion};
-  // Sigma X3F: the Foveon operators live in the native decode, not in the
-  // host graph, so the parameters that drive them are part of the source
-  // identity. 0 for every other format and for an X3F with no live operators.
-  lookup.decode_variant = x3f::ActiveFoveonVariant(lookup.encoded_content_hash);
   if (auto it = entries_.find(lookup); it != entries_.end()) {
     ++stats_.hits;
     return MakeLease(it->second);
