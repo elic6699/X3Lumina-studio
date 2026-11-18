@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <tuple>
 #include <unordered_set>
@@ -112,15 +113,19 @@ void ImportExportHandler::BindCollaborators(StatsEngine* stats, NikonHeRecoveryC
 
 auto ImportExportHandler::SupportedImportNameFilters() -> QStringList {
   QStringList patterns;
+  // Some cameras (notably Sigma Foveon) write upper-case extensions. macOS native file
+  // dialogs match glob patterns case-sensitively, so list both cases for every extension.
+  const auto append_extension = [&patterns](const std::string_view extension) {
+    const QString lower = QString::fromLatin1(extension.data(),
+                                              static_cast<qsizetype>(extension.size()));
+    patterns.push_back(QStringLiteral("*") + lower);
+    patterns.push_back(QStringLiteral("*") + lower.toUpper());
+  };
   for (const auto extension : kRawExtensions) {
-    patterns.push_back(
-        QStringLiteral("*") +
-        QString::fromLatin1(extension.data(), static_cast<qsizetype>(extension.size())));
+    append_extension(extension);
   }
   for (const auto& raster : kRasterImportExtensions) {
-    patterns.push_back(QStringLiteral("*") +
-                       QString::fromLatin1(raster.extension.data(),
-                                           static_cast<qsizetype>(raster.extension.size())));
+    append_extension(raster.extension);
   }
   return patterns;
 }

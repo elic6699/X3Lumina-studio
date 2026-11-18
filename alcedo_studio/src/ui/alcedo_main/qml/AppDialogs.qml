@@ -43,6 +43,7 @@ Item {
         title: qsTr("Select Images")
         fileMode: FileDialog.OpenFiles
         nameFilters: [
+            qsTr("Sigma Foveon (*.x3f *.X3F *.x3i *.X3I)"),
             qsTr("Supported images (%1)").arg(root.supportedImagePatterns),
             qsTr("All Files (*)")
         ]
