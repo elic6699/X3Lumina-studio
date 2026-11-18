@@ -216,18 +216,31 @@ What must be redone: re-apply the bridge and rebuild Studio once per upgrade.
 ```sh
 cd /Users/daniellee/WorkBuddy/X3Lumina-Studio
 
-# 1. See what this upgrade costs. Nothing is written to the working tree.
-scripts/upstream_upgrade.sh check
+# 1. Sync the fork in the web UI (Fork > Sync fork). The script compares the two
+#    SHAs and stops if the fork does not carry upstream yet — merging then would
+#    silently merge nothing.
+#
+# 2. One command: fetch the fork branch, trial-merge, merge, verify the bridge.
+scripts/upstream_upgrade.sh sync
 
-# 2. Merge upstream into the work branch. The script refuses a dirty tree and
-#    creates a backup/pre-upgrade-<timestamp> tag first.
-scripts/upstream_upgrade.sh apply
+# 3. Build. The build mode sets DEVELOPER_DIR when xcode-select points at the
+#    Command Line Tools and the Metal compiler is therefore not on PATH.
+scripts/upstream_upgrade.sh build
 
-# 3. Confirm that every bridge file and call site is still present.
-scripts/upstream_upgrade.sh verify --no-fetch
+# Or add --build to step 2, and rebuild the run you use daily with build/run-dev.sh.
+```
 
-# 4. Rebuild and redeploy your fork's build
-cmake --preset macos_debug && cmake --build build/macos-debug
+`sync` refuses a dirty working tree (untracked files are fine), creates a
+`backup/pre-upgrade-<timestamp>` tag before merging, and stops on any conflict instead of
+resolving it for you. Re-run it as often as you like — when the fork already matches, the
+merge is a no-op.
+
+The individual modes remain available when something needs a closer look:
+
+```sh
+scripts/upstream_upgrade.sh check     # report only: commits, bridge files, conflicts
+scripts/upstream_upgrade.sh apply     # merge only
+scripts/upstream_upgrade.sh verify    # bridge files and call sites only
 ```
 
 `check` reports three items: the commits to merge, the bridge files that upstream changed,

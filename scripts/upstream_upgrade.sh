@@ -3,14 +3,22 @@
 # Upgrade this fork to a newer Alcedo Studio and confirm that the external editor
 # bridge survived the merge.
 #
+#   scripts/upstream_upgrade.sh sync     # fork sync check, merge, verify (one command)
 #   scripts/upstream_upgrade.sh check    # default: report what the merge would cost
 #   scripts/upstream_upgrade.sh apply    # merge upstream/main into the current branch
 #   scripts/upstream_upgrade.sh verify   # confirm every bridge file and call site
+#   scripts/upstream_upgrade.sh build    # configure and build with the Metal dir set
 #
 # Options:
-#   --no-fetch      use the upstream ref that is already stored locally
-#   --remote <name> upstream remote name (default: upstream)
-#   --branch <name> upstream branch name (default: main)
+#   --no-fetch          use the ref that is already stored locally
+#   --remote <name>     upstream remote name (default: upstream)
+#   --branch <name>     upstream branch name (default: main)
+#   --preset <name>     CMake preset used by build (default: macos_release)
+#   --build             sync also builds once the merge succeeds
+#
+# sync assumes the fork was synced in the web UI first. It compares
+# origin/<branch> with upstream/<branch> by SHA, so the large upstream history is
+# never downloaded; the merge then only fetches the fork branch.
 #
 # The bridge can only live in the files below, so these files are the only place
 # where the merge can touch bridge code. See docs/x3lumina-external-editor.md.
@@ -22,9 +30,12 @@ cd "$ROOT"
 
 REMOTE=${UPSTREAM_REMOTE:-upstream}
 BRANCH=${UPSTREAM_BRANCH:-main}
+PRESET=${BUILD_PRESET:-macos_release}
 MODE=check
 DO_FETCH=1
+DO_BUILD=0
 MISSING=0
+TRIAL_OK=0
 
 BRIDGE_FILES="
 alcedo_studio/src/include/app/external_editor_bridge.hpp
@@ -40,18 +51,24 @@ alcedo_studio/src/ui/alcedo_main/CMakeLists.txt
 
 usage() {
   cat <<'TEXT'
-Usage: scripts/upstream_upgrade.sh [check|apply|verify] [options]
+Usage: scripts/upstream_upgrade.sh [sync|check|apply|verify|build] [options]
 
+  sync     Compare the fork with upstream, merge the fork branch, then verify.
+           Stops when the fork was not synced or the merge would conflict.
   check    Report the commits to merge, the bridge files that upstream changed,
            and the files that would conflict. Changes nothing.
   apply    Merge upstream into the current branch. Refuses a dirty working tree.
            Creates a backup tag first.
   verify   Confirm that every bridge file and call site is still present.
+  build    Configure and build the preset. Sets DEVELOPER_DIR when the Metal
+           toolchain is not on PATH.
 
 Options:
-  --no-fetch      use the upstream ref already stored locally
+  --no-fetch      use the ref already stored locally
   --remote <n>    upstream remote name (default: upstream)
   --branch <n>    upstream branch name (default: main)
+  --preset <n>    CMake preset used by build (default: macos_release)
+  --build         sync also builds once the merge succeeds
 TEXT
 }
 
@@ -61,8 +78,9 @@ fail() { printf 'ERROR %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    check | apply | verify) MODE=$1 ;;
+    sync | check | apply | verify | build) MODE=$1 ;;
     --no-fetch) DO_FETCH=0 ;;
+    --build) DO_BUILD=1 ;;
     --remote)
       shift
       REMOTE=${1:?--remote needs a value}
@@ -70,6 +88,10 @@ while [ $# -gt 0 ]; do
     --branch)
       shift
       BRANCH=${1:?--branch needs a value}
+      ;;
+    --preset)
+      shift
+      PRESET=${1:?--preset needs a value}
       ;;
     -h | --help)
       usage
@@ -97,10 +119,42 @@ fetch_upstream() {
   require_upstream
 }
 
-mode_check() {
-  fetch_upstream
+require_clean_tree() {
+  # Untracked files never block a merge (a stray probe file in the tree is fine).
+  [ -z "$(git status --porcelain --untracked-files=no)" ] ||
+    fail "working tree is not clean. Commit or stash the changes first."
+}
 
-  base=$(git merge-base HEAD "$UPSTREAM_REF")
+tag_and_merge() {
+  tag="backup/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+  git tag "$tag"
+  info "Backup tag: $tag"
+
+  if git merge --no-ff "$UPSTREAM_REF"; then
+    info ""
+    info "Merge completed."
+  else
+    info ""
+    warn "Merge stopped with conflicts:"
+    git diff --name-only --diff-filter=U | as_lines "  "
+    info ""
+    info "Resolve them, then: git add <files> && git merge --continue"
+    info "Undo the whole merge: git merge --abort"
+    info "Undo and return to the backup tag: git reset --hard $tag"
+    exit 1
+  fi
+}
+
+as_lines() {
+  prefix=$1
+  while IFS= read -r line; do
+    [ -n "$line" ] && printf '%s%s\n' "$prefix" "$line"
+  done
+}
+
+report_state() {
+  base=$(git merge-base HEAD "$UPSTREAM_REF" 2>/dev/null || true)
+  [ -n "$base" ] || fail "no common ancestor with $UPSTREAM_REF. Merge by hand."
   behind=$(git rev-list --count "HEAD..$UPSTREAM_REF")
   ahead=$(git rev-list --count "$UPSTREAM_REF..HEAD")
 
@@ -125,7 +179,9 @@ mode_check() {
   trial=$(git merge-tree --write-tree --name-only HEAD "$UPSTREAM_REF" 2>&1)
   rc=$?
   set -e
+  TRIAL_OK=0
   if [ "$rc" -eq 0 ]; then
+    TRIAL_OK=1
     info "  clean, the merge applies without a conflict"
   else
     info "  conflicts below. Resolve them where they fall, then run apply."
@@ -134,38 +190,64 @@ mode_check() {
   info ""
 }
 
-as_lines() {
-  prefix=$1
-  while IFS= read -r line; do
-    [ -n "$line" ] && printf '%s%s\n' "$prefix" "$line"
-  done
+mode_check() {
+  fetch_upstream
+  report_state
+  info "Next:"
+  info "  scripts/upstream_upgrade.sh apply    # merge it"
+  info "  scripts/upstream_upgrade.sh verify   # after the merge"
 }
 
 mode_apply() {
-  [ -z "$(git status --porcelain)" ] ||
-    fail "working tree is not clean. Commit or stash the changes first."
-
+  require_clean_tree
   fetch_upstream
+  tag_and_merge
+  info "Next:"
+  info "  1. scripts/upstream_upgrade.sh verify --no-fetch"
+  info "  2. scripts/upstream_upgrade.sh build"
+}
 
-  tag="backup/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
-  git tag "$tag"
-  info "Backup tag: $tag"
+remote_head() {
+  git ls-remote --refs "$1" "refs/heads/$BRANCH" 2>/dev/null | cut -f1 | head -n 1
+}
 
-  if git merge --no-ff "$UPSTREAM_REF"; then
+mode_sync() {
+  fork_head=$(remote_head origin || true)
+  upstream_head=$(remote_head upstream || true)
+
+  [ -n "$fork_head" ] || fail "cannot read origin/$BRANCH. Check the remote and the network."
+  [ -n "$upstream_head" ] || fail "cannot read upstream/$BRANCH. Check the remote and the network."
+
+  info "fork $BRANCH:     $(printf '%.7s' "$fork_head")"
+  info "upstream $BRANCH: $(printf '%.7s' "$upstream_head")"
+
+  if [ "$fork_head" != "$upstream_head" ]; then
+    fail "the fork does not carry upstream yet. Sync it in the web UI (Fork > Sync fork), then run sync again.
+       Merging now would silently merge nothing."
+  fi
+
+  # The fork already carries upstream's head, so fetching it is small.
+  info ""
+  info "Fetching origin/$BRANCH (the fork already matches upstream)."
+  git fetch origin "$BRANCH"
+  UPSTREAM_REF="origin/$BRANCH"
+  require_upstream
+
+  report_state
+
+  if [ "$TRIAL_OK" -ne 1 ]; then
+    fail "the merge conflicts. Run apply, resolve the files above, then verify."
+  fi
+
+  require_clean_tree
+  tag_and_merge
+  mode_verify
+
+  info "Next:"
+  info "  scripts/upstream_upgrade.sh build    # or build/run-dev.sh for the run you use daily"
+  if [ "$DO_BUILD" -eq 1 ]; then
     info ""
-    info "Merge completed."
-    info "Next:"
-    info "  1. scripts/upstream_upgrade.sh verify --no-fetch"
-    info "  2. cmake --preset macos_debug && cmake --build build/macos-debug"
-  else
-    info ""
-    warn "Merge stopped with conflicts:"
-    git diff --name-only --diff-filter=U | as_lines "  "
-    info ""
-    info "Resolve them, then: git add <files> && git merge --continue"
-    info "Undo the whole merge: git merge --abort"
-    info "Undo and return to the backup tag: git reset --hard $tag"
-    exit 1
+    mode_build
   fi
 }
 
@@ -215,8 +297,27 @@ mode_verify() {
   fi
 }
 
+mode_build() {
+  xcode_dir=/Applications/Xcode.app/Contents/Developer
+  if ! xcrun -f metal >/dev/null 2>&1; then
+    info "metal is not on PATH (xcode-select may point at the Command Line Tools)."
+    info "Using $xcode_dir for this build."
+    export DEVELOPER_DIR="$xcode_dir"
+  fi
+
+  info "Configuring preset $PRESET"
+  cmake --preset "$PRESET"
+  info ""
+  info "Building preset $PRESET"
+  cmake --build --preset "$PRESET"
+  info ""
+  info "Build finished."
+}
+
 case "$MODE" in
+  sync) mode_sync ;;
   check) mode_check ;;
   apply) mode_apply ;;
   verify) mode_verify ;;
+  build) mode_build ;;
 esac
