@@ -290,10 +290,32 @@ mode_verify() {
     "external_commands.cpp" "build entry"
 
   info ""
+  info "X3F/X3I import layer (fork commits, not part of the bridge patch):"
+  for f in \
+    alcedo_studio/src/decoders/x3f/x3f_support.cpp \
+    alcedo_studio/src/include/decoders/x3f/x3f_support.hpp \
+    alcedo_studio/src/io/image/embedded_preview_reader.cpp; do
+    if [ -f "$f" ]; then
+      info "  OK      $f"
+    else
+      warn "MISSING $f"
+      MISSING=1
+    fi
+  done
+  check_symbol alcedo_studio/src/image/metadata_extractor.cpp \
+    "ReadEmbeddedJpeg" "import metadata reads the embedded JPEG"
+  check_symbol alcedo_studio/src/io/image/image_loader.cpp \
+    "IsX3fFile" "image loader routes X3F/X3I sources"
+  check_symbol alcedo_studio/src/decoders/x3f/CMakeLists.txt \
+    "alcedo_x3f_import" "import-only decode target"
+  check_symbol alcedo_studio/src/decoders/CMakeLists.txt \
+    "alcedo_x3f_import" "ImageLoader links the import target"
+
+  info ""
   if [ "$MISSING" -eq 0 ]; then
-    info "Bridge is complete. Rebuild, then double-click one X3F to confirm the handoff."
+    info "Bridge and import layer are complete. Rebuild, then double-click one X3F to confirm the handoff."
   else
-    fail "bridge is incomplete after the upgrade"
+    fail "the bridge or the import layer is incomplete after the upgrade"
   fi
 }
 
