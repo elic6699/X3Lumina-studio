@@ -216,32 +216,33 @@ What must be redone: re-apply the bridge and rebuild Studio once per upgrade.
 ```sh
 cd /Users/daniellee/WorkBuddy/X3Lumina-Studio
 
-# 1. Fetch the official upstream
-git fetch upstream
+# 1. See what this upgrade costs. Nothing is written to the working tree.
+scripts/upstream_upgrade.sh check
 
-# 2. Sync your fork's main, then bring the work branch forward
-git checkout main
-git merge --ff-only upstream/main      # or merge if main has fork-only commits
-git push origin main
-git checkout feature/x3f-x3i-decoder
-git merge main                         # or: git rebase main
+# 2. Merge upstream into the work branch. The script refuses a dirty tree and
+#    creates a backup/pre-upgrade-<timestamp> tag first.
+scripts/upstream_upgrade.sh apply
 
-# 3. Resolve conflicts only at the bridge touchpoints listed in the source map above
-#    (thumbnail_service.cpp, workspace_router.*, application_module_host.cpp,
-#     automation_host_session.cpp, CMakeLists.txt). The bridge is ~470 lines across 10 files.
+# 3. Confirm that every bridge file and call site is still present.
+scripts/upstream_upgrade.sh verify --no-fetch
 
-# 4. Rebuild Studio and redeploy your fork's build
+# 4. Rebuild and redeploy your fork's build
+cmake --preset macos_debug && cmake --build build/macos-debug
 ```
 
-To make re-application explicit (useful if a release branch is started from clean upstream),
-save the bridge as a patch and apply it with `git am`:
+`check` reports three items: the commits to merge, the bridge files that upstream changed,
+and the files that would conflict. The last item comes from a `git merge-tree` trial merge,
+so the working tree stays untouched. A conflict can only fall in the nine bridge files
+listed in the source map above; resolve it there, then run `apply`.
+
+To re-apply the bridge on a branch that starts from clean upstream, use the stored patch
+instead of a merge:
 
 ```sh
-git format-patch -1 1ebb063 -o patches/
-git am patches/0001-feat-external-*.patch
+git am patches/external-bridge/0001-*.patch
 ```
 
-Post-upgrade smoke check:
+Post-upgrade check:
 
 ```sh
 defaults read com.alcedo-app.Alcedo "externalEditor.x3luminaAppPath"

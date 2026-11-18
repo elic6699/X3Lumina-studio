@@ -1,0 +1,660 @@
+From 1ebb0632563e86148fae1b34729e8214831cf3df Mon Sep 17 00:00:00 2001
+From: daniel lee <105474506+elic6699@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 16:23:55 +0800
+Subject: [PATCH] =?UTF-8?q?feat(external):=20=E5=A4=96=E6=8C=82=E7=BC=96?=
+ =?UTF-8?q?=E8=BE=91=E8=96=84=E6=A1=A5=E3=80=81=E4=BB=A3=E7=90=86=E9=A2=84?=
+ =?UTF-8?q?=E8=A7=88=E4=B8=8E=20refreshThumbnail=20=E5=91=BD=E4=BB=A4?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ alcedo_studio/src/app/thumbnail_service.cpp   |  15 +-
+ .../include/app/external_editor_bridge.hpp    |  74 +++++++
+ .../album_backend/workspace_router.hpp        |  15 ++
+ .../automation_external_commands.hpp          |  23 ++
+ .../src/ui/alcedo_main/CMakeLists.txt         |   2 +
+ .../album_backend/application_module_host.cpp |  50 +++++
+ .../album_backend/workspace_router.cpp        |  28 +++
+ .../automation/automation_host_session.cpp    |   4 +-
+ .../automation/commands/external_commands.cpp |  66 ++++++
+ docs/x3lumina-external-editor.md              | 198 ++++++++++++++++++
+ 10 files changed, 473 insertions(+), 2 deletions(-)
+ create mode 100644 alcedo_studio/src/include/app/external_editor_bridge.hpp
+ create mode 100644 alcedo_studio/src/include/ui/alcedo_main/automation/automation_external_commands.hpp
+ create mode 100644 alcedo_studio/src/ui/alcedo_main/automation/commands/external_commands.cpp
+ create mode 100644 docs/x3lumina-external-editor.md
+
+diff --git a/alcedo_studio/src/app/thumbnail_service.cpp b/alcedo_studio/src/app/thumbnail_service.cpp
+index c4dac97..1c7c84f 100644
+--- a/alcedo_studio/src/app/thumbnail_service.cpp
++++ b/alcedo_studio/src/app/thumbnail_service.cpp
+@@ -23,6 +23,7 @@
+ #include <vector>
+ 
+ #include "app/batch_executor_pool.hpp"
++#include "app/external_editor_bridge.hpp"
+ #include "app/pipeline_service.hpp"
+ #include "app/thumbnail_disk_cache_service.hpp"
+ #include "concurrency/thread_pool.hpp"
+@@ -458,9 +459,21 @@ void ThumbnailService::State::DecodeRenditionSource(
+             std::format("[ERROR] ThumbnailService: image {} of element {} is not in the pool.",
+                         request->image_id, request->element_id));
+       }
++      // Thin bridge: an externally managed source (X3F/X3I) is culled from the sidecar
++      // JPEG that the companion app writes, not from the Foveon decode chain. The bytes are
++      // a plain camera JPEG, so the raster path below applies the scaled decode. This is
++      // display-referred preview data only; it never reaches Develop or export.
++      // Check the sidecar before loading the source bytes: an X3I container can be gigabytes
++      // and materializing one frame just to discard it would be wasteful.
++      const auto source_path = image->image_path_;
++      std::vector<std::uint8_t> proxy;
++      const bool use_proxy = external_editor::IsExternallyManaged(source_path) &&
++                             external_editor::TryReadProxyJpeg(source_path, &proxy);
+       std::shared_ptr<const PreparedRawInput> source;
+       {
+-        const auto encoded = ByteBufferLoader::LoadByteBufferFromImage(std::move(image));
++        auto encoded = use_proxy
++                           ? std::move(proxy)
++                           : ByteBufferLoader::LoadByteBufferFromImage(std::move(image));
+         if (request->IsCanceled()) {
+           request->Fail(ThumbnailRequestStatus::kCanceled, "Request was canceled.");
+           return;
+diff --git a/alcedo_studio/src/include/app/external_editor_bridge.hpp b/alcedo_studio/src/include/app/external_editor_bridge.hpp
+new file mode 100644
+index 0000000..12340f7
+--- /dev/null
++++ b/alcedo_studio/src/include/app/external_editor_bridge.hpp
+@@ -0,0 +1,74 @@
++//  Copyright 2026 X3Lumina Studio contributors
++//  SPDX-License-Identifier: GPL-3.0-only
++//  Additional permission under GPLv3 section 7 applies; see the LICENSE file.
++
++#pragma once
++
++#include <algorithm>
++#include <cstdint>
++#include <filesystem>
++#include <fstream>
++#include <string_view>
++#include <system_error>
++#include <vector>
++
++namespace alcedo::external_editor {
++
++/// Suffix appended to a source path for the sidecar JPEG that the external editor writes.
++inline constexpr std::string_view kProxySuffix = ".x3fproxy.jpg";
++
++/// QSettings keys for the external editor command. NativeFormat, UserScope.
++inline constexpr const char* kAppPathKey = "externalEditor/x3luminaAppPath";
++inline constexpr const char* kArgsKey    = "externalEditor/x3luminaArgs";
++
++/// True for a source whose editing is owned by the external app. Extension only: no file
++/// access and no decoder dependency, so every thin bridge can call this.
++[[nodiscard]] inline auto IsExternallyManaged(const std::filesystem::path& source) -> bool {
++  const auto ext = source.extension().wstring();
++  const auto equal_ignore_case = [&ext](std::wstring_view candidate) {
++    return ext.size() == candidate.size() &&
++           std::equal(ext.begin(), ext.end(), candidate.begin(), [](wchar_t a, wchar_t b) {
++             return a == b || (a >= L'A' && a <= L'Z' && a - L'A' + L'a' == b);
++           });
++  };
++  return equal_ignore_case(L".x3f") || equal_ignore_case(L".x3i");
++}
++
++/// Path of the sidecar JPEG: "<source>.x3fproxy.jpg", in the same directory as the source.
++[[nodiscard]] inline auto ProxyJpegPath(const std::filesystem::path& source)
++    -> std::filesystem::path {
++  std::wstring name = source.wstring();
++  name.append(kProxySuffix.begin(), kProxySuffix.end());
++  return std::filesystem::path(name);
++}
++
++/// Reads the sidecar JPEG bytes. Returns false when it is absent, unreadable, empty, or
++/// implausibly large. The caller keeps its existing source when this returns false.
++[[nodiscard]] inline auto TryReadProxyJpeg(const std::filesystem::path& source,
++                                           std::vector<std::uint8_t>* bytes) -> bool {
++  if (bytes == nullptr) {
++    return false;
++  }
++  std::error_code ec;
++  const auto path = ProxyJpegPath(source);
++  if (!std::filesystem::is_regular_file(path, ec) || ec) {
++    return false;
++  }
++  const auto size = std::filesystem::file_size(path, ec);
++  if (ec || size == 0 || size > (64u << 20)) {
++    return false;
++  }
++  std::ifstream in(path, std::ios::binary);
++  if (!in) {
++    return false;
++  }
++  bytes->resize(static_cast<std::size_t>(size));
++  in.read(reinterpret_cast<char*>(bytes->data()), static_cast<std::streamsize>(size));
++  if (!in || static_cast<std::size_t>(in.gcount()) != bytes->size()) {
++    bytes->clear();
++    return false;
++  }
++  return true;
++}
++
++}  // namespace alcedo::external_editor
+diff --git a/alcedo_studio/src/include/ui/alcedo_main/album_backend/workspace_router.hpp b/alcedo_studio/src/include/ui/alcedo_main/album_backend/workspace_router.hpp
+index 1dafbe3..2d5d68a 100644
+--- a/alcedo_studio/src/include/ui/alcedo_main/album_backend/workspace_router.hpp
++++ b/alcedo_studio/src/include/ui/alcedo_main/album_backend/workspace_router.hpp
+@@ -7,6 +7,10 @@
+ #include <QObject>
+ #include <QString>
+ 
++#include <cstdint>
++#include <filesystem>
++#include <functional>
++
+ #include "ui/alcedo_main/album_backend/interaction_policy_controller.hpp"
+ 
+ namespace alcedo::ui {
+@@ -31,6 +35,15 @@ class WorkspaceRouter final : public QObject {
+   /// The policy whose agent control refuses user image switches. Null refuses nothing.
+   void             SetInteractionPolicy(InteractionPolicyController* interaction_policy);
+ 
++  /// Resolves an image id to its on-disk source path. Injected by ApplicationModuleHost so
++  /// this router, like FoveonSessionController, does not depend on the image-pool internals.
++  using PathResolver = std::function<std::filesystem::path(std::uint32_t)>;
++  /// Launches the companion editor for one source. Returns false when it is not configured,
++  /// so the ordinary editor route proceeds. Injected for testability.
++  using EditorLauncher = std::function<bool(const std::filesystem::path&)>;
++  void SetPathResolver(PathResolver resolver) { path_resolver_ = std::move(resolver); }
++  void SetEditorLauncher(EditorLauncher launcher) { editor_launcher_ = std::move(launcher); }
++
+   Q_INVOKABLE void OpenLibrary();
+   /// Shared route operation of the UI and the automation commands.
+   Q_INVOKABLE void OpenEditor(uint elementId = 0, uint imageId = 0);
+@@ -47,6 +60,8 @@ class WorkspaceRouter final : public QObject {
+  private:
+   EditorSessionController*     editor_session_     = nullptr;
+   InteractionPolicyController* interaction_policy_ = nullptr;
++  PathResolver                 path_resolver_;
++  EditorLauncher               editor_launcher_;
+   QString                  workspace_ = QStringLiteral("library");
+   uint                     element_id_ = 0;
+   uint                     image_id_ = 0;
+diff --git a/alcedo_studio/src/include/ui/alcedo_main/automation/automation_external_commands.hpp b/alcedo_studio/src/include/ui/alcedo_main/automation/automation_external_commands.hpp
+new file mode 100644
+index 0000000..7f3ac4d
+--- /dev/null
++++ b/alcedo_studio/src/include/ui/alcedo_main/automation/automation_external_commands.hpp
+@@ -0,0 +1,23 @@
++//  Copyright 2026 X3Lumina Studio contributors
++//  SPDX-License-Identifier: GPL-3.0-only
++//  Additional permission under GPLv3 section 7 applies; see the LICENSE file.
++
++#pragma once
++
++#include <QString>
++
++#include "ui/alcedo_main/album_backend/application_module_host.hpp"
++#include "ui/alcedo_main/automation/automation_command_registry.hpp"
++
++namespace alcedo::automation {
++
++/// Registers `external.refreshThumbnail`. A companion app calls it over the local socket
++/// after it writes a sidecar JPEG, so the library drops the cached preview of the named
++/// photos and renders the new one. It only invalidates display data: no Develop document,
++/// history, source file, or export pipeline is touched. @p host must outlive every dispatch.
++/// Returns false and writes @p error when registration fails.
++[[nodiscard]] auto RegisterAutomationExternalCommands(AutomationCommandRegistry& registry,
++                                                      ui::ApplicationModuleHost* host,
++                                                      QString* error = nullptr) -> bool;
++
++}  // namespace alcedo::automation
+diff --git a/alcedo_studio/src/ui/alcedo_main/CMakeLists.txt b/alcedo_studio/src/ui/alcedo_main/CMakeLists.txt
+index 7875905..2153555 100644
+--- a/alcedo_studio/src/ui/alcedo_main/CMakeLists.txt
++++ b/alcedo_studio/src/ui/alcedo_main/CMakeLists.txt
+@@ -512,6 +512,8 @@ def_library(AutomationHostLib
+         "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/automation/automation_library_commands.hpp"
+         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/export_commands.cpp"
+         "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/automation/automation_export_commands.hpp"
++        "${ALCEDO_UI_SHELL_ROOT}/automation/commands/external_commands.cpp"
++        "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/automation/automation_external_commands.hpp"
+         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/label_commands.cpp"
+         "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/automation/automation_label_commands.hpp"
+         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/search_commands.cpp"
+diff --git a/alcedo_studio/src/ui/alcedo_main/album_backend/application_module_host.cpp b/alcedo_studio/src/ui/alcedo_main/album_backend/application_module_host.cpp
+index da2e48e..5f0993c 100644
+--- a/alcedo_studio/src/ui/alcedo_main/album_backend/application_module_host.cpp
++++ b/alcedo_studio/src/ui/alcedo_main/album_backend/application_module_host.cpp
+@@ -8,9 +8,12 @@
+ #include <QDeadlineTimer>
+ #include <QDebug>
+ #include <QEventLoop>
++#include <QFileInfo>
+ #include <QMetaObject>
+ #include <QPointer>
++#include <QProcess>
+ #include <QQmlEngine>
++#include <QSettings>
+ #include <QStringList>
+ #include <QThread>
+ #include <algorithm>
+@@ -26,6 +29,7 @@
+ 
+ #include "app/editor_adjustment_context.hpp"
+ #include "app/editor_pending_input.hpp"
++#include "app/external_editor_bridge.hpp"
+ #include "app/editor_session_bootstrap.hpp"
+ #include "app/image_pool_service.hpp"
+ #include "app/project_package_backend.hpp"
+@@ -359,6 +363,8 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver
+       return {};
+     }
+   };
++  // Keep a copy for the companion-app handoff before foveon_path is moved into path B.
++  auto external_path = foveon_path;
+   foveon_session_ =
+       std::make_unique<FoveonSessionController>(std::move(foveon_path), this);
+   RecordConstruction("FoveonSessionController", foveon_session_.get());
+@@ -366,6 +372,11 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver
+           foveon_session_.get(), [this]() {
+             if (editor_session_ && foveon_session_) {
+               foveon_session_->SyncFromImageId(editor_session_->image_id());
++              // The Tone panel owns fill_light now. Mirror its document value
++              // into the decode params so X3F renders through the Retinex gain
++              // map; the Grade skips its own stand-in for the same frame.
++              foveon_session_->SyncFillLightFromDocument(
++                  editor_session_->adjustment_snapshot());
+             }
+           });
+ 
+@@ -515,6 +526,45 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver
+   RecordConstruction("LutPreviewController", lut_preview_.get());
+   workspace_router_ = std::make_unique<WorkspaceRouter>(editor_session_.get(), this);
+   workspace_router_->SetInteractionPolicy(interaction_policy_.get());
++  // Thin bridge: hand X3F/X3I edits to the companion app. The executable and its extra
++  // arguments are user settings; the source path is always appended as the last argument.
++  workspace_router_->SetPathResolver(external_path);
++  workspace_router_->SetEditorLauncher([](const std::filesystem::path& source) -> bool {
++    QSettings settings;
++    // On macOS QSettings stores the '/' group separator as part of a flat key. `defaults
++    // write -dict-add`, however, produces a nested QVariantMap under "externalEditor".
++    // Accept both spellings so either configuration method works.
++    const auto read_setting = [&settings](const char* flat_key, const QString& group,
++                                          const QString& leaf) -> QString {
++      const QString flat = settings.value(QLatin1String(flat_key)).toString();
++      if (!flat.isEmpty()) {
++        return flat;
++      }
++      return settings.value(group).toMap().value(leaf).toString();
++    };
++    const QString app = read_setting(external_editor::kAppPathKey,
++                                     QStringLiteral("externalEditor"),
++                                     QStringLiteral("x3luminaAppPath"));
++    qWarning().noquote() << "[X3LuminaBridge] launcher invoked:"
++                         << "appPath=" << app
++                         << "exists=" << QFileInfo::exists(app)
++                         << "source=" << QString::fromStdWString(source.generic_wstring());
++    if (app.isEmpty()) {
++      return false;
++    }
++    QStringList args;
++    const QString extra = read_setting(external_editor::kArgsKey,
++                                       QStringLiteral("externalEditor"),
++                                       QStringLiteral("x3luminaArgs"));
++    if (!extra.isEmpty()) {
++      args = QProcess::splitCommand(extra);
++    }
++    args.append(QString::fromStdWString(source.generic_wstring()));
++    const bool started = QProcess::startDetached(app, args);
++    qWarning().noquote() << "[X3LuminaBridge] startDetached result=" << started
++                         << "args=" << args.join(QLatin1String(" "));
++    return started;
++  });
+   RecordConstruction("WorkspaceRouter", workspace_router_.get());
+   editor_behavior_ = std::make_unique<EditorBehaviorPreferences>(this);
+   RecordConstruction("EditorBehaviorPreferences", editor_behavior_.get());
+diff --git a/alcedo_studio/src/ui/alcedo_main/album_backend/workspace_router.cpp b/alcedo_studio/src/ui/alcedo_main/album_backend/workspace_router.cpp
+index b2067dd..e53c03d 100644
+--- a/alcedo_studio/src/ui/alcedo_main/album_backend/workspace_router.cpp
++++ b/alcedo_studio/src/ui/alcedo_main/album_backend/workspace_router.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include <QDebug>
+ 
++#include "app/external_editor_bridge.hpp"
+ #include "ui/alcedo_main/album_backend/editor_session_controller.hpp"
+ #include "utils/diagnostics/app_logging.hpp"
+ 
+@@ -51,6 +52,33 @@ void WorkspaceRouter::OpenLibrary() {
+ }
+ 
+ void WorkspaceRouter::OpenEditor(uint elementId, uint imageId) {
++  // Thin bridge: X3F/X3I editing is owned by the companion app. Resolve the source from the
++  // image id and hand it off. When the launcher accepts, no editor workspace is opened, so the
++  // built-in Develop DAG never sees a Foveon source. When the companion app is not configured
++  // the launcher declines; the ordinary editor route then runs the product's existing X3F
++  // path (the wide-gamut Foveon chain, not the display-referred proxy), so the photo stays
++  // editable. That is configuration-not-enabled, not a degraded substitute for a failed path.
++  qWarning().noquote() << "[X3LuminaBridge] OpenEditor entered:"
++                       << "elementId=" << elementId << "imageId=" << imageId
++                       << "resolver=" << bool(path_resolver_)
++                       << "launcher=" << bool(editor_launcher_);
++  if (path_resolver_ && editor_launcher_ && imageId != 0) {
++    const auto source = path_resolver_(imageId);
++    qWarning().noquote() << "[X3LuminaBridge] resolved source:"
++                         << QString::fromStdWString(source.wstring())
++                         << "managed=" << external_editor::IsExternallyManaged(source);
++    if (external_editor::IsExternallyManaged(source)) {
++      if (editor_launcher_(source)) {
++        qCInfo(alcedo::diag::editorLog).noquote()
++            << "workspace.openEditor delegated to companion app:"
++            << QString::fromStdWString(source.wstring());
++        return;
++      }
++      qCInfo(alcedo::diag::editorLog).noquote()
++          << "workspace.openEditor companion app not configured; using built-in editor for:"
++          << QString::fromStdWString(source.wstring());
++    }
++  }
+   workspace_  = QStringLiteral("editor");
+   element_id_ = elementId;
+   image_id_   = imageId;
+diff --git a/alcedo_studio/src/ui/alcedo_main/automation/automation_host_session.cpp b/alcedo_studio/src/ui/alcedo_main/automation/automation_host_session.cpp
+index f757408..6033bd8 100644
+--- a/alcedo_studio/src/ui/alcedo_main/automation/automation_host_session.cpp
++++ b/alcedo_studio/src/ui/alcedo_main/automation/automation_host_session.cpp
+@@ -16,6 +16,7 @@
+ #include "ui/alcedo_main/automation/automation_control_commands.hpp"
+ #include "ui/alcedo_main/automation/automation_curve_commands.hpp"
+ #include "ui/alcedo_main/automation/automation_editor_commands.hpp"
++#include "ui/alcedo_main/automation/automation_external_commands.hpp"
+ #include "ui/alcedo_main/automation/automation_export_commands.hpp"
+ #include "ui/alcedo_main/automation/automation_film_commands.hpp"
+ #include "ui/alcedo_main/automation/automation_host_commands.hpp"
+@@ -174,7 +175,8 @@ auto AutomationHostSession::RegisterCommands(QString* error) -> bool {
+          RegisterAutomationEditorCommands(registry_, host_, error) &&
+          RegisterAutomationVersionCommands(registry_, host_, error) &&
+          RegisterAutomationRenderCommands(registry_, host_, error) &&
+-         RegisterAutomationAdjustmentCommands(registry_, host_, options_.host_mode, error);
++         RegisterAutomationAdjustmentCommands(registry_, host_, options_.host_mode, error) &&
++         RegisterAutomationExternalCommands(registry_, host_, error);
+ }
+ 
+ auto AutomationHostSession::WriteSessionFile(QString* error) -> bool {
+diff --git a/alcedo_studio/src/ui/alcedo_main/automation/commands/external_commands.cpp b/alcedo_studio/src/ui/alcedo_main/automation/commands/external_commands.cpp
+new file mode 100644
+index 0000000..9968b56
+--- /dev/null
++++ b/alcedo_studio/src/ui/alcedo_main/automation/commands/external_commands.cpp
+@@ -0,0 +1,66 @@
++//  Copyright 2026 X3Lumina Studio contributors
++//  SPDX-License-Identifier: GPL-3.0-only
++//  Additional permission under GPLv3 section 7 applies; see the LICENSE file.
++
++#include "ui/alcedo_main/automation/automation_external_commands.hpp"
++
++#include <QJsonArray>
++#include <QJsonObject>
++#include <QVariantMap>
++
++#include <utility>
++
++#include "app/thumbnail_service.hpp"
++#include "sleeve/album_query.hpp"
++#include "ui/alcedo_main/automation/automation_command_support.hpp"
++
++namespace alcedo::automation {
++namespace {
++
++auto ElementIdsParam() -> QJsonObject { return AutomationElementIdListSchema(); }
++
++void RegisterOrFail(AutomationCommandRegistry& registry, AutomationCommandSpec spec, bool* ok,
++                    QString* error) {
++  if (*ok && !registry.Register(std::move(spec), error)) {
++    *ok = false;
++  }
++}
++
++}  // namespace
++
++auto RegisterAutomationExternalCommands(AutomationCommandRegistry& registry,
++                                        ui::ApplicationModuleHost* host, QString* error) -> bool {
++  bool ok = true;
++
++  AutomationCommandSpec refresh_thumbnail;
++  refresh_thumbnail.method = QStringLiteral("external.refreshThumbnail");
++  refresh_thumbnail.description = QStringLiteral(
++      "Drops the cached previews of 'element_ids' after a companion app wrote new sidecar "
++      "JPEGs. The library renders the new previews on the next request. Only display data "
++      "is invalidated: the source files, Develop documents, and export pipeline are untouched.");
++  refresh_thumbnail.changes_state = false;
++  refresh_thumbnail.params_schema = AutomationClosedParamsSchema(
++      QJsonObject{{"element_ids", ElementIdsParam()}}, QJsonArray{"element_ids"});
++  refresh_thumbnail.result_schema = AutomationObjectSchema();
++  refresh_thumbnail.handler = [host](const QJsonObject& params, AutomationReply reply) {
++    const auto project = AutomationEnteredProject(host, reply);
++    if (!project) {
++      return;
++    }
++    const auto rows = ResolveAutomationElementRows(*project, params, reply);
++    if (!rows.has_value()) {
++      return;
++    }
++    if (const auto thumbnails = host->project()->handler().thumbnail_service()) {
++      for (const auto& row : *rows) {
++        thumbnails->InvalidateThumbnail(row.file_id_);
++      }
++    }
++    reply.SendResult(QJsonObject{{"refreshed_count", static_cast<int>(rows->size())}});
++  };
++  RegisterOrFail(registry, std::move(refresh_thumbnail), &ok, error);
++
++  return ok;
++}
++
++}  // namespace alcedo::automation
+diff --git a/docs/x3lumina-external-editor.md b/docs/x3lumina-external-editor.md
+new file mode 100644
+index 0000000..af75954
+--- /dev/null
++++ b/docs/x3lumina-external-editor.md
+@@ -0,0 +1,198 @@
++# X3Lumina companion editor (external bridge)
++
++Alcedo Studio manages every photo, including Sigma X3F/X3I files. It does **not** decode or
++edit a Foveon file itself. Editing is owned by a separate app, `x3lumina`, that runs as its own
++process and can be upgraded independently of Alcedo Studio.
++
++This document is the protocol both sides follow. It has four parts: import and culling,
++the handoff on double-click, the refresh after an edit, and batch export.
++
++## Invariants
++
++- The source `.x3f` / `.x3i` file is **read-only**. Nothing in this protocol writes to it.
++- Alcedo Studio's Develop graph, colour pipeline, and export path never receive a Foveon
++  source or a companion-app product. Only the DAM preview (a display-referred JPEG) changes.
++- Wide-gamut rendering and export happen only inside `x3lumina`, whose C/Rust decode stack is
++  not linked into Alcedo Studio.
++
++## 1. Import and culling (Alcedo Studio side)
++
++`.x3f` and `.x3i` are import categories. Import metadata comes from the camera's embedded
++JPEG, so no Foveon decode runs during a bulk import. Rating, color label, reject, and album
++membership are ordinary DAM operations and work on these files like any other photo.
++
++The culling preview is a **sidecar JPEG** next to the source:
++
++```
++<source directory>/<source name>.x3fproxy.jpg
++```
++
++Example: `photos/2017/SD14_0014.X3F` → `photos/2017/SD14_0014.X3F.x3fproxy.jpg`.
++
++The suffix is `.x3fproxy.jpg` and is appended to the full source name. `ThumbnailService`
++reads this file when present; when absent it falls back to the built-in reader. The sidecar
++is a plain camera JPEG (SOI..EOI, no colour transform), so no ICC rewrite is needed for a
++display-referred preview.
++
++## 2. Handoff on double-click (Alcedo Studio → x3lumina)
++
++Double-clicking an X3F/X3I in the library does **not** open the built-in editor. Alcedo Studio
++resolves the image id to its source path and starts the companion app:
++
++```
++<app> [extra args...] <absolute source path>
++```
++
++Configuration is in QSettings (NativeFormat, UserScope):
++
++| Key | Meaning | Default |
++| --- | --- | --- |
++| `externalEditor/x3luminaAppPath` | Path to the `x3lumina` executable or `.app` | empty (handoff disabled) |
++| `externalEditor/x3luminaArgs` | Extra arguments, split with shell-like quoting | empty |
++
++The source path is always appended as the last argument. If the app path is empty, the
++handoff is disabled and the ordinary editor route proceeds. Configure the app path once;
++it is not stored in the project.
++
++### How to write these settings on macOS (important)
++
++The app reads these with `QSettings` in `NativeFormat`. On macOS, Qt 6 stores the `/` group
++separator as a **dot** in the plist. So the on-disk key is `externalEditor.x3luminaAppPath`,
++and that is the spelling `defaults` must use:
++
++```sh
++defaults write com.alcedo-app.Alcedo "externalEditor.x3luminaAppPath" \
++  "/Applications/X3Lumina.app/Contents/MacOS/X3FExtractor"
++killall cfprefsd
++```
++
++Do **not** use `externalEditor/x3luminaAppPath` (slash) with `defaults` — Qt reads that as a
++different key and returns empty. Do **not** use `defaults write ... externalEditor -dict-add`
++either: that creates a nested `QVariantMap`. Current builds accept the nested form as a
++fallback, but the dot-separated flat key above is what QSettings itself writes and is the
++reliable choice.
++
++To confirm what the app will read:
++
++```sh
++defaults read com.alcedo-app.Alcedo "externalEditor.x3luminaAppPath"
++```
++
++`x3lumina` must accept the handoff and open a window with a preview and an editing surface.
++It needs no other UI module.
++
++### Companion-app side: the `--external-edit` entry point
++
++The stock X3Lumina Mac app (Swift, `outputs/X3FExtractor`) does **not** read dropped file
++paths or Apple Events — it only remembers a browse directory and selects the first photo.
++So we added a dedicated entry point in that project (`ExternalLaunch.swift`, `App.swift`,
++`Views.swift`):
++
++```sh
++X3FExtractor --external-edit "/absolute/path/IMG.X3F"
++```
++
++On launch it opens the photo's directory, selects exactly that file (by path), and hides
++the bottom filmstrip — leaving the left directory pane, center editor, and right parameter
++pane. No decode/colour/export pipeline code was touched. This is why `x3luminaArgs` must be
++set to `--external-edit`: the launcher appends the source path as the final argument,
++producing `--external-edit <path>`.
++
++Only the *UI layout and startup selection* changed in the companion app; the handoff here
++in Alcedo Studio is unchanged. The companion app is built independently with its own
++`make_app.sh` and can be upgraded on its own schedule.
++
++## 3. Refresh after an edit (x3lumina → Alcedo Studio)
++
++After writing a new sidecar JPEG, `x3lumina` tells Alcedo Studio to drop the cached previews.
++Alcedo Studio exposes a local JSON-RPC socket; its session file lives in the automation
++session directory. Use the repository CLI (`alcedo-cli`), which discovers the socket:
++
++```sh
++alcedo-cli call external.refreshThumbnail '{"element_ids": [12, 34]}'
++```
++
++`element_ids` are the library element ids of the photos whose proxies changed. The command
++invalidates the cached thumbnails of exactly those elements; the library renders the new
++previews on the next request. It does not touch source files, Develop documents, or history.
++
++`x3lumina` needs the element ids. Two ways to get them:
++
++- When Alcedo Studio starts the handoff, also pass the element id (add it to
++  `externalEditor/x3luminaArgs`, for example `--element-id 12`). The app echoes it back on
++  export. This is the simple path for one-photo edits.
++- For a batch, call `alcedo-cli call library.info` to map source paths to element ids first.
++
++The refresh command is best-effort: a failed call leaves the old preview cached, which is
++harmless. There is no retry protocol.
++
++## 3b. Export destination in external mode (x3lumina → Alcedo Studio editor)
++
++In external-edit mode `--external-edit <path>`, `x3lumina` also changes what happens **after**
++an export. This is the only behavioural difference; the decode/colour/export pipeline is
++untouched (the TIFF/DNG is still produced by x3lumina's own wide-gamut pipeline).
++
++- **JPEG (embedded extract) and JPEG (RAW re-encode)**: on export completion, x3lumina
++  terminates itself. No dialog — the user is handing a finished JPEG back to the DAM.
++- **16-bit TIFF and DNG**: pressing "start export" first shows a two-way choice:
++  1. **直接导出 (Direct export)** — write the file with x3lumina's pipeline, then terminate.
++  2. **回传 Alcedo 继续编辑 (Hand back to Alcedo)** — write the file, then import it into the
++     running Alcedo Studio library and open it in Alcedo's built-in editor, where the user
++     continues editing and exports. x3lumina terminates once the handoff succeeds.
++
++The handoff (option 2) is implemented in `AlcedoHandoff.swift` as a sequence of `alcedo-cli`
++automation calls over the GUI host's JSON-RPC socket:
++
++```sh
++alcedo-cli --json --session gui call library.import  '{"paths":["<exported.tif>"]}'   # -> task_id
++alcedo-cli --json --session gui call tasks.wait      '{"task_id":"<id>"}'              # wait for import
++alcedo-cli --json --session gui call search.query    '{"text":"<stem>","mode":"fuzzy"}' # -> element_id
++alcedo-cli --json --session gui call editor.open     '{"element_id":<id>}'              # open in editor
++```
++
++Notes:
++
++- `element_id` is recovered by matching the imported file's `file_name` against the exported
++  basename (search is retried a few times because its index is asynchronous).
++- The `--session` name is read from the live GUI session file; without it, `alcedo-cli`
++  refuses when more than one session file is live.
++- The `alcedo-cli` path is taken from an optional `--alcedo-cli <path>` launch argument, then
++  `ALCEDO_CLI`, then a list of well-known locations (installed app / build trees). Pass it from
++  `externalEditor/x3luminaArgs` if the app is installed somewhere non-standard.
++- TIFF/DNG are **not** `.x3f`/`.x3i`, so `editor.open` does not re-trigger the external bridge;
++  it lands in Alcedo's own editor. This is what makes "continue editing in Alcedo" possible.
++- The handoff is best-effort. If any CLI call fails, x3lumina stays open, shows the error with
++  the output path, and the user can import the file manually. Nothing is written back to the
++  source X3F/X3I.
++
++Relevant companion-app files: `ExternalLaunch.swift` (post-export dispatch, foreground/maximize),
++`AlcedoHandoff.swift` (CLI chain), `Engine.swift` (`onExportFinished` + exported URL list),
++`Views.swift` (`ExportDestinationSheet`).
++
++## 4. Batch export (x3lumina CLI)
++
++Batch export does not involve Alcedo Studio at all. `x3lumina` provides a CLI that takes a
++list of source files and writes rendered outputs with its own wide-gamut pipeline:
++
++```sh
++x3lumina-cli export --preset <name> --out <dir> <source1.x3f> <source2.x3i> ...
++```
++
++The exact flags are owned by the `x3lumina` project. The only requirement from Alcedo
++Studio is that batch export never writes into the source directory's `.x3fproxy.jpg` files
++unless it also issues the refresh call from section 3.
++
++## Thin-bridge source map
++
++These are the only Alcedo Studio files that know about the external editor:
++
++| File | Role |
++| --- | --- |
++| `src/include/app/external_editor_bridge.hpp` | Extension check, proxy path, proxy byte reader; no decoder dependency |
++| `src/app/thumbnail_service.cpp` | Culling preview from the proxy JPEG |
++| `src/include/ui/alcedo_main/album_backend/workspace_router.hpp`, `src/ui/alcedo_main/album_backend/workspace_router.cpp` | Double-click handoff |
++| `src/ui/alcedo_main/album_backend/application_module_host.cpp` | Injects path resolver and process launcher |
++| `src/include/ui/alcedo_main/automation/automation_external_commands.hpp`, `src/ui/alcedo_main/automation/commands/external_commands.cpp` | `external.refreshThumbnail` command |
++
++Keeping the bridge in these files means an Alcedo Studio upgrade only needs these small
++patches re-applied, not the full Foveon decode stack.
