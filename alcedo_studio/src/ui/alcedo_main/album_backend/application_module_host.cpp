@@ -34,6 +34,8 @@
 #include "app/image_pool_service.hpp"
 #include "app/project_package_backend.hpp"
 #include "app/project_service.hpp"
+#include "edit/graph/develop_node_model.hpp"
+#include "edit/runtime/lens/lens_calibration_resolver.hpp"
 #include "image/image.hpp"
 #include "ui/alcedo_main/album_backend/comparison_image_provider.hpp"
 #include "ui/alcedo_main/album_backend/display_profile_readout.hpp"
@@ -442,10 +444,10 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
     if (!pool) {
       return {};
     }
+    alcedo::EditorImageExifDisplay display;
     try {
-      return pool->Read<alcedo::EditorImageExifDisplay>(
-          static_cast<std::uint32_t>(image_id),
-          [](const std::shared_ptr<alcedo::Image>& image) {
+      display = pool->Read<alcedo::EditorImageExifDisplay>(
+          static_cast<std::uint32_t>(image_id), [](const std::shared_ptr<alcedo::Image>& image) {
             if (!image) {
               return alcedo::EditorImageExifDisplay{};
             }
@@ -454,6 +456,25 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
     } catch (const std::exception&) {
       return {};
     }
+    // A fixed-lens camera (GFX100RF, Ricoh GR III) writes no lens name. Lens Correction then uses
+    // the profile of the built-in lens (#960), so Auto names that profile too.
+    if (display.lens_model.empty() && !display.camera_model.empty()) {
+      alcedo::LensInputMeta meta;
+      meta.cam_maker_         = display.camera_make;
+      meta.cam_model_         = display.camera_model;
+      meta.focal_length_mm_   = display.focal_mm.value_or(0.0f);
+      meta.aperture_f_number_ = display.aperture.value_or(0.0f);
+      if (const auto profile = alcedo::LensCalibrationResolver::FixedLensProfile(
+              meta, alcedo::DevelopPayload{}.lens_profile_db_path)) {
+        display.lens_make  = profile->maker_;
+        display.lens_model = profile->model_;
+      }
+    }
+    return display;
+  });
+  // The reader above runs on the UI thread; load the Lensfun database here so it does not.
+  lensfun_preload_ = std::thread([] {
+    alcedo::LensCalibrationResolver::PreloadDatabase(alcedo::DevelopPayload{}.lens_profile_db_path);
   });
   adjustment_transfer_->SetEditorSession(editor_session_.get());
   connect(adjustment_transfer_.get(), &AdjustmentTransferController::PackageChanged,
@@ -476,37 +497,44 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
                                  : nullptr;
         });
   }
-  // An export renders on its own executor. The editor releases its GPU resources before the
-  // export allocates, and allocates them again on its next frame after the export ends.
-  import_export_->SetExportGpuResourceRelease(ExportGpuResourceRelease{
-      .release_before_export =
-          [this](ExportGpuResourceRelease::ReleaseCompletion on_released) {
-            const auto scheduler = editor_session_scheduler_;
-            if (!scheduler) {
-              on_released(true, {});
-              return;
-            }
-            // Queued on the session owner before the port refuses its first frame, so the owner
-            // records every refused frame and routes it again only after the export.
-            if (editor_session_runtime_ && editor_session_runtime_->service) {
-              editor_session_runtime_->service->SetSuspendedForExport(true);
-            }
-            scheduler->ReleaseGpuResourcesForExport(
-                [on_released = std::move(on_released)](EditorGpuResourceRelease release) {
-                  on_released(release.success, std::move(release.error));
-                });
-          },
-      .resume_after_export =
-          [this] {
-            // The port renders again before the owner routes the refused frames.
-            if (editor_session_scheduler_) {
-              editor_session_scheduler_->ResumeGpuResourcesAfterExport();
-            }
-            if (editor_session_runtime_ && editor_session_runtime_->service) {
-              editor_session_runtime_->service->SetSuspendedForExport(false);
-            }
-          },
-  });
+  // An export and semantic generation render on their own executors. The editor releases its GPU
+  // resources before either allocates, and allocates them again on its next frame after the last
+  // of them ends.
+  const auto editor_gpu_release_hooks = [this](EditorGpuReleaseHolder holder) {
+    return EditorGpuResourceReleaseHooks{
+        .release =
+            [this, holder](EditorGpuResourceReleaseHooks::ReleaseCompletion on_released) {
+              const auto scheduler = editor_session_scheduler_;
+              if (!scheduler) {
+                on_released(true, {});
+                return;
+              }
+              // Queued on the session owner before the port refuses its first frame, so the
+              // owner records every refused frame and routes it again only after the release.
+              if (editor_session_runtime_ && editor_session_runtime_->service) {
+                editor_session_runtime_->service->SetSuspendedForGpuRelease(true);
+              }
+              (void)scheduler->AcquireGpuResourceRelease(
+                  holder,
+                  [on_released = std::move(on_released)](EditorGpuResourceRelease release) {
+                    on_released(release.success, std::move(release.error));
+                  });
+            },
+        .resume =
+            [this, holder] {
+              // The port renders again before the owner routes the refused frames.
+              const bool last = editor_session_scheduler_ &&
+                                editor_session_scheduler_->EndGpuResourceRelease(holder);
+              if (last && editor_session_runtime_ && editor_session_runtime_->service) {
+                editor_session_runtime_->service->SetSuspendedForGpuRelease(false);
+              }
+            },
+    };
+  };
+  import_export_->SetExportGpuResourceRelease(
+      editor_gpu_release_hooks(EditorGpuReleaseHolder::Export));
+  semantic_generation_->SetEditorGpuResourceRelease(
+      editor_gpu_release_hooks(EditorGpuReleaseHolder::SemanticGeneration));
   lut_browser_ = std::make_unique<LutLibraryModel>();
   lut_browser_->setLibrary(lut_library_.get());
   RecordConstruction("LutLibraryModel", lut_browser_.get());
@@ -810,6 +838,9 @@ void ApplicationModuleHost::ShutdownModules() {
 }
 
 ApplicationModuleHost::~ApplicationModuleHost() {
+  if (lensfun_preload_.joinable()) {
+    lensfun_preload_.join();
+  }
   ShutdownModules();
   // The session-owner worker calls the observers that EditorSessionController installed, and a
   // callback it already copied still runs after the controller clears its observer slots. The

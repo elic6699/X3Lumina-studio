@@ -133,7 +133,7 @@ void ImportExportHandler::SetInteractionPolicy(InteractionPolicyController* inte
   interaction_policy_ = interaction_policy;
 }
 
-void ImportExportHandler::SetExportGpuResourceRelease(ExportGpuResourceRelease release) {
+void ImportExportHandler::SetExportGpuResourceRelease(EditorGpuResourceReleaseHooks release) {
   export_gpu_resource_release_ = std::move(release);
 }
 
@@ -574,6 +574,7 @@ void ImportExportHandler::StartExportWithRecipeOptionsForTargets(
   }
 
   export_item_statuses_.clear();
+  ++export_run_id_;
   for (const auto& [elementId, imageId] : queue_result.queued_targets_) {
     export_item_statuses_.insert(ExportStatusKey(elementId, imageId), QStringLiteral("queued"));
   }
@@ -591,7 +592,7 @@ void ImportExportHandler::StartExportWithRecipeOptionsForTargets(
   emit exportStateChanged();
   status_->SetTaskState(export_status_text_, 0, false);
 
-  if (!export_gpu_resource_release_.release_before_export) {
+  if (!export_gpu_resource_release_.release) {
     RenderQueuedExport(queue_result.skipped_count_);
     return;
   }
@@ -599,7 +600,7 @@ void ImportExportHandler::StartExportWithRecipeOptionsForTargets(
   // the editor released them, so the two never hold device memory at the same time.
   export_gpu_resources_released_ = true;
   QPointer<ImportExportHandler> self(this);
-  export_gpu_resource_release_.release_before_export(
+  export_gpu_resource_release_.release(
       [self, queued = queue_result.queued_count_, skipped = queue_result.skipped_count_](
           bool success, std::string error) {
         if (!self) return;
@@ -904,8 +905,8 @@ void ImportExportHandler::FinishExport(const std::shared_ptr<std::vector<ExportR
                                        int skippedCount) {
   export_inflight_ = false;
   if (std::exchange(export_gpu_resources_released_, false) &&
-      export_gpu_resource_release_.resume_after_export) {
-    export_gpu_resource_release_.resume_after_export();
+      export_gpu_resource_release_.resume) {
+    export_gpu_resource_release_.resume();
   }
 
   int         ok   = 0;

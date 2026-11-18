@@ -483,6 +483,8 @@ target_link_libraries(AlcedoQanGraph
 # The editor shell is QML-only. Widgets remains private to the album backend for
 # the native project and Nikon recovery file dialogs.
 target_link_libraries(AlbumBackendLib PRIVATE Qt6::Widgets)
+# The editor names the built-in lens profile of a fixed-lens camera for Lens Correction Auto (#960).
+target_link_libraries(AlbumBackendLib PRIVATE EditRuntimeLens)
 target_link_libraries(AlbumBackendLib PUBLIC AlcedoQanGraph)
 
 # Automation command surface: JSON-RPC command registry, schema validation, the local socket
@@ -527,6 +529,7 @@ def_library(AutomationHostLib
         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/editor_commands.cpp"
         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/render_commands.cpp"
         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/version_commands.cpp"
+        "${ALCEDO_UI_SHELL_ROOT}/automation/commands/node_commands.cpp"
         "${ALCEDO_UI_SHELL_ROOT}/automation/commands/adjustment_commands.cpp"
         "${ALCEDO_INCLUDE_ROOT}/ui/alcedo_main/automation/automation_adjustment_commands.hpp"
         "${ALCEDO_UI_SHELL_ROOT}/automation/automation_editor_operation.cpp"
@@ -983,6 +986,8 @@ set(ALCEDO_MAIN_QML_FILES
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorMaskGroupsPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorMaskGroupDelegate.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/EditorMaskGroupMaskRow.qml"
+    "${ALCEDO_UI_SHELL_ROOT}/qml/EditorLayerIconButton.qml"
+    "${ALCEDO_UI_SHELL_ROOT}/qml/EditorAiMaskTile.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/AdjustmentSlider.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/AlcedoSlider.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/LoadingSpinner.qml"
