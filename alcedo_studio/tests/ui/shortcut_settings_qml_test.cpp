@@ -352,11 +352,11 @@ TEST(ShortcutSettingsQmlTest, KeyboardCategoryIsReachableAndAboutStillOpens) {
   ASSERT_TRUE(settings->property("visible").toBool());
 
   // Reach Keyboard through the real category nav, not a direct index write.
-  auto* nav_keyboard = FindItem(settings, QStringLiteral("settingsNavItem:7"));
+  auto* nav_keyboard = FindItem(settings, QStringLiteral("settingsNavItem:6"));
   ASSERT_NE(nav_keyboard, nullptr);
   ScrollItemIntoView(harness.window_, QStringLiteral("settingsNavScroll"), nav_keyboard);
   ClickItem(harness.window_, nav_keyboard);
-  EXPECT_EQ(settings->property("currentCategory").toInt(), 7);
+  EXPECT_EQ(settings->property("currentCategory").toInt(), 6);
 
   auto* page_title = FindItem(settings, QStringLiteral("settingsPageTitle"));
   ASSERT_NE(page_title, nullptr);
@@ -372,13 +372,13 @@ TEST(ShortcutSettingsQmlTest, KeyboardCategoryIsReachableAndAboutStillOpens) {
   EXPECT_FALSE(about_scroll->property("visible").toBool());
   EXPECT_NE(FieldForCommand(settings, QStringLiteral("library.selectAll")), nullptr);
 
-  // About moved to index 11 (after LUTs, Camera Profiles, and AI Models) and still opens.
-  auto* nav_about = FindItem(settings, QStringLiteral("settingsNavItem:11"));
+  // About moved to index 9 (after LUTs, Camera Profiles, and AI Models) and still opens.
+  auto* nav_about = FindItem(settings, QStringLiteral("settingsNavItem:9"));
   ASSERT_NE(nav_about, nullptr);
   // The category nav scrolls; About can sit below the fold.
   ScrollItemIntoView(harness.window_, QStringLiteral("settingsNavScroll"), nav_about);
   ClickItem(harness.window_, nav_about);
-  EXPECT_EQ(settings->property("currentCategory").toInt(), 11);
+  EXPECT_EQ(settings->property("currentCategory").toInt(), 9);
   EXPECT_EQ(page_title->property("text").toString(), DialogText("About"));
   EXPECT_TRUE(about_scroll->property("visible").toBool());
   EXPECT_FALSE(keyboard_scroll->property("visible").toBool());
@@ -514,7 +514,7 @@ TEST(ShortcutSettingsQmlTest, EscapeSavesCandidateWithoutClosingTheDialog) {
   ASSERT_NE(harness.window_, nullptr) << harness.warnings_.join('\n').toStdString();
   auto* settings = harness.dialog();
   ASSERT_NE(settings, nullptr);
-  harness.OpenAt(7);
+  harness.OpenAt(6);
   ASSERT_TRUE(settings->property("visible").toBool());
 
   auto* field = StartDialogCapture(harness, QStringLiteral("library.selectAll"));
@@ -538,7 +538,7 @@ TEST(ShortcutSettingsQmlTest, SecondEscapeClosesTheDialogAfterCaptureEnds) {
   ASSERT_NE(harness.window_, nullptr) << harness.warnings_.join('\n').toStdString();
   auto* settings = harness.dialog();
   ASSERT_NE(settings, nullptr);
-  harness.OpenAt(7);
+  harness.OpenAt(6);
   ASSERT_TRUE(settings->property("visible").toBool());
 
   auto* field = StartDialogCapture(harness, QStringLiteral("library.selectAll"));

@@ -36,7 +36,6 @@ Dialog {
     property string acceleratorWarning: ""
     property bool acceleratorWarningShown: false
     property string serviceMessage: ""
-    property var updateService: null
     // Match the host window's corner radius so the modal backdrop doesn't bleed past rounded corners.
     property real cornerRadius: 0
     // "overview" or "form". The empty layout follows from the adapter state.
@@ -290,16 +289,6 @@ Dialog {
         implicitWidth: dialog.width
         implicitHeight: dialog.height
 
-        Timer {
-            interval: 700
-            repeat: false
-            running: dialog.visible
-                     && dialog.updateService
-                     && dialog.updateService.enabled
-                     && dialog.updateService.unchecked
-            onTriggered: dialog.updateService.CheckForUpdates()
-        }
-
         Rectangle {
             id: shell
             objectName: "welcomeCard"
@@ -335,27 +324,11 @@ Dialog {
 
                 Row {
                     Accessible.role: Accessible.Heading
-                    Accessible.name: qsTr("Alcedo Studio")
+                    Accessible.name: qsTr("X3LuminaStudio")
 
                     Label {
-                        text: qsTr("Alcedo")
+                        text: qsTr("X3LuminaStudio")
                         color: appTheme.accentColor
-                        font.family: appTheme.headlineFontFamily
-                        font.pixelSize: appTheme.fontSizeHeadline
-                        font.weight: appTheme.fontWeightHeading
-                        Accessible.ignored: true
-                    }
-
-                    Label {
-                        text: " "
-                        font.family: appTheme.headlineFontFamily
-                        font.pixelSize: appTheme.fontSizeHeadline
-                        Accessible.ignored: true
-                    }
-
-                    Label {
-                        text: qsTr("Studio")
-                        color: appTheme.textColor
                         font.family: appTheme.headlineFontFamily
                         font.pixelSize: appTheme.fontSizeHeadline
                         font.weight: appTheme.fontWeightHeading
@@ -480,7 +453,7 @@ Dialog {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: qsTr("Choose a folder for the project file, then import your photos. Alcedo does not move or change the original photos.")
+                                text: qsTr("Choose a folder for the project file, then import your photos. X3LuminaStudio does not move or change the original photos.")
                                 color: appTheme.textMutedColor
                                 font.family: appTheme.uiFontFamily
                                 font.pixelSize: appTheme.fontSizeBody

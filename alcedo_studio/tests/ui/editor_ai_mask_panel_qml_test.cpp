@@ -254,7 +254,7 @@ TEST(EditorAiMaskPanelQmlTest, MissingModelSetShowsItsStateAndOpenAiModelsOpensS
   const std::vector<std::pair<QString, QString>> states = {
       {QStringLiteral("updateRequired"), QStringLiteral("too old")},
       {QStringLiteral("needsNewerApplication"),
-       QStringLiteral("need a newer version of Alcedo Studio")},
+       QStringLiteral("need a newer version of X3LuminaStudio")},
       {QStringLiteral("repairRequired"), QStringLiteral("incomplete")}};
   for (const auto& [state, expected] : states) {
     harness.tool()->setProperty("modelSetState", state);

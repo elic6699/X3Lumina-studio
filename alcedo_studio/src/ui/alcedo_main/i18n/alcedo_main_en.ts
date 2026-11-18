@@ -5,12 +5,12 @@
     <name>AboutPage</name>
     <message>
         <location filename="../qml/AboutPage.qml" line="+82"/>
-        <source>Welcome to Alcedo Studio</source>
+        <source>Welcome to X3LuminaStudio</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+10"/>
-        <source>The documentation walks you through importing, editing, and managing your photos step by step. Follow development on GitHub, and if Alcedo Studio is useful to you, consider supporting it with a donation.</source>
+        <source>The documentation walks you through importing, editing, and managing your photos step by step. Follow development on GitHub, and if X3LuminaStudio is useful to you, consider supporting it with a donation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -35,8 +35,8 @@
     </message>
     <message>
         <location line="+11"/>
-        <source>Alcedo Studio</source>
-        <translation type="unfinished">Alcedo Studio</translation>
+        <source>X3LuminaStudio</source>
+        <translation type="unfinished">X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -85,7 +85,7 @@
     </message>
     <message>
         <location line="+11"/>
-        <source>Alcedo Studio builds on research, open-source implementations, and community data from the wider imaging ecosystem:</source>
+        <source>X3LuminaStudio builds on research, open-source implementations, and community data from the wider imaging ecosystem:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -639,7 +639,7 @@
     </message>
     <message>
         <location line="+21"/>
-        <source>This build does not include Codex OAuth import. Rebuild Alcedo Studio.</source>
+        <source>This build does not include Codex OAuth import. Rebuild X3LuminaStudio.</source>
         <translation type="obsolete"></translation>
     </message>
     <message>
@@ -942,7 +942,7 @@
         <translation type="unfinished">Cancel</translation>
     </message>
     <message>
-        <source>Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, Alcedo Studio can no longer delete them for you.</source>
+        <source>Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, X3LuminaStudio can no longer delete them for you.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1183,25 +1183,25 @@
     </message>
     <message>
         <location line="+1"/>
-        <source>This machine has an NVIDIA graphics card, but it does not meet Alcedo&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
+        <source>This machine has an NVIDIA graphics card, but it does not meet X3LuminaStudio&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
 
 %2
 
-Alcedo will use %3 instead.</source>
-        <translation>This machine has an NVIDIA graphics card, but it does not meet Alcedo&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
+X3LuminaStudio will use %3 instead.</source>
+        <translation>This machine has an NVIDIA graphics card, but it does not meet X3LuminaStudio&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
 
 %2
 
-Alcedo will use %3 instead.</translation>
+X3LuminaStudio will use %3 instead.</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>CUDA acceleration is not supported on this machine because no NVIDIA graphics card was detected.
 
-Alcedo will use %1 instead.</source>
+X3LuminaStudio will use %1 instead.</source>
         <translation>CUDA acceleration is not supported on this machine because no NVIDIA graphics card was detected.
 
-Alcedo will use %1 instead.</translation>
+X3LuminaStudio will use %1 instead.</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -1250,7 +1250,7 @@ Alcedo will use %1 instead.</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>The accelerator change will apply after Alcedo restarts.</source>
+        <source>The accelerator change will apply after X3LuminaStudio restarts.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1810,8 +1810,8 @@ Alcedo will use %1 instead.</translation>
     </message>
     <message>
         <location line="+119"/>
-        <source>Alcedo</source>
-        <translation type="unfinished">Alcedo</translation>
+        <source>X3LuminaStudio</source>
+        <translation type="unfinished">X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -5014,7 +5014,7 @@ Original source files on disk will be kept.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The default adjustment node applies Alcedo&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those default adjustments to the masked area, which differs from traditional editing software.
+        <source>The default adjustment node applies X3LuminaStudio&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those default adjustments to the masked area, which differs from traditional editing software.
 
 Create a new layer above it and draw the Mask there?</source>
         <translation type="unfinished"></translation>
@@ -5071,8 +5071,8 @@ Create a new layer above it and draw the Mask there?</source>
     <name>Main</name>
     <message>
         <location filename="../qml/Main.qml" line="+48"/>
-        <source>Alcedo Studio</source>
-        <translation type="unfinished">Alcedo Studio</translation>
+        <source>X3LuminaStudio</source>
+        <translation type="unfinished">X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+292"/>
@@ -5233,7 +5233,7 @@ Create a new layer above it and draw the Mask there?</source>
 <context>
     <name>SavedAiKeysReminder</name>
     <message>
-        <source>Alcedo Studio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings &gt; Saved AI Keys.</source>
+        <source>X3LuminaStudio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings &gt; Saved AI Keys.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -5592,8 +5592,8 @@ Create a new layer above it and draw the Mask there?</source>
     </message>
     <message>
         <location line="+21"/>
-        <source>Restart Alcedo yourself to apply this backend change.</source>
-        <translation>Restart Alcedo yourself to apply this backend change.</translation>
+        <source>Restart X3LuminaStudio yourself to apply this backend change.</source>
+        <translation>Restart X3LuminaStudio yourself to apply this backend change.</translation>
     </message>
     <message>
         <location line="-562"/>
@@ -5618,7 +5618,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="-185"/>
-        <source>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；Alcedo Studio 不会保留任何内容。
+        <source>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；X3LuminaStudio 不会保留任何内容。
 
 这个设置界面的灵感来自 ccswitch，使用方式也类似。</source>
         <translation type="unfinished"></translation>
@@ -5677,7 +5677,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>The default adjustment node applies Alcedo&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.</source>
+        <source>The default adjustment node applies X3LuminaStudio&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5937,7 +5937,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+1"/>
-        <source>Alcedo Studio is up to date</source>
+        <source>X3LuminaStudio is up to date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5957,12 +5957,12 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+2"/>
-        <source>The package is verified. Install will close Alcedo Studio, replace this copy, and reopen.</source>
+        <source>The package is verified. Install will close X3LuminaStudio, replace this copy, and reopen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>Alcedo Studio is closing so the installer can replace this copy.</source>
+        <source>X3LuminaStudio is closing so the installer can replace this copy.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6103,13 +6103,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="338"/>
-        <source>Alcedo Studio</source>
-        <translation>Alcedo Studio</translation>
-    </message>
-    <message>
-        <location filename="../qml/WelcomeDialog.qml" line="341"/>
-        <source>Alcedo</source>
-        <translation>Alcedo</translation>
+        <source>X3LuminaStudio</source>
+        <translation>X3LuminaStudio</translation>
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="357"/>
@@ -6139,8 +6134,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="483"/>
-        <source>Choose a folder for the project file, then import your photos. Alcedo does not move or change the original photos.</source>
-        <translation>Choose a folder for the project file, then import your photos. Alcedo does not move or change the original photos.</translation>
+        <source>Choose a folder for the project file, then import your photos. X3LuminaStudio does not move or change the original photos.</source>
+        <translation>Choose a folder for the project file, then import your photos. X3LuminaStudio does not move or change the original photos.</translation>
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="515"/>
@@ -6373,12 +6368,12 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+39"/>
-        <source>Alcedo Studio is up to date.</source>
+        <source>X3LuminaStudio is up to date.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+6"/>
-        <source>Alcedo Studio %1 is available.</source>
+        <source>X3LuminaStudio %1 is available.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6393,7 +6388,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+3"/>
-        <source>Downloading Alcedo Studio %1…</source>
+        <source>Downloading X3LuminaStudio %1…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6409,7 +6404,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     <message>
         <location line="+7"/>
         <location line="+126"/>
-        <source>Alcedo Studio %1 is ready to install.</source>
+        <source>X3LuminaStudio %1 is ready to install.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6429,7 +6424,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+22"/>
-        <source>Alcedo Studio cannot replace the app in this folder. The update ZIP was opened for manual installation.</source>
+        <source>X3LuminaStudio cannot replace the app in this folder. The update ZIP was opened for manual installation.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6450,7 +6445,7 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="-12"/>
-        <source>Alcedo Studio will close and install the update.</source>
+        <source>X3LuminaStudio will close and install the update.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

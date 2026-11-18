@@ -361,14 +361,14 @@ TEST(SimplifiedChineseCatalogTest, CompiledCatalogTranslatesTheAiMaskModelSetSta
             QStringLiteral("AI 蒙版模型尚未安装。请在“设置 > AI 模型”页面下载。"));
   EXPECT_EQ(QCoreApplication::translate("EditorAiMaskPanel",
                                         "The installed AI Mask models are too old for this "
-                                        "version of Alcedo Studio. Update them on the AI Models "
+                                        "version of X3LuminaStudio. Update them on the AI Models "
                                         "page in Settings."),
-            QStringLiteral("已安装的 AI 蒙版模型版本过旧，此版本的 Alcedo Studio "
+            QStringLiteral("已安装的 AI 蒙版模型版本过旧，此版本的 X3LuminaStudio "
                            "无法使用。请在“设置 > AI 模型”页面更新。"));
   EXPECT_EQ(QCoreApplication::translate("EditorAiMaskPanel",
-                                        "The AI Mask models need a newer version of Alcedo "
-                                        "Studio. Update Alcedo Studio to use AI Mask."),
-            QStringLiteral("AI 蒙版模型需要更新版本的 Alcedo Studio。请更新 Alcedo Studio "
+                                        "The AI Mask models need a newer version of "
+                                        "X3LuminaStudio. Update X3LuminaStudio to use AI Mask."),
+            QStringLiteral("AI 蒙版模型需要更新版本的 X3LuminaStudio。请更新 X3LuminaStudio "
                            "后使用 AI 蒙版。"));
   EXPECT_EQ(QCoreApplication::translate("EditorAiMaskPanel",
                                         "The installed AI Mask models are incomplete. Repair "
@@ -392,16 +392,16 @@ TEST(SimplifiedChineseCatalogTest, CompiledCatalogTranslatesTheAiModelDownloadSt
   EXPECT_EQ(
       QCoreApplication::translate(
           "AiModelDownloadStatementDialog",
-          "The Sky model and the people and sky locator are trained by Alcedo Studio. The Sky "
+          "The Sky model and the people and sky locator are trained by X3LuminaStudio. The Sky "
           "model is trained on the MaSS13K dataset (%1), which does not state a clear license. "
           "For commercial use of the Sky model or its output, contact the authors of the dataset. "
-          "Alcedo Studio does not guarantee that the models it trains can be used for commercial "
+          "X3LuminaStudio does not guarantee that the models it trains can be used for commercial "
           "work. The Subject model (S3OD) is trained on generated images and on labels from other "
           "datasets; see the NOTICE file of the package."),
       QStringLiteral(
-          "天空模型与人物/天空定位模型由 Alcedo Studio 训练。天空模型使用 MaSS13K "
+          "天空模型与人物/天空定位模型由 X3LuminaStudio 训练。天空模型使用 MaSS13K "
           "数据集（%1）训练，该数据集未明确声明许可证。如需将天空模型或其输出用于商业用途"
-          "，请联系数据集作者。Alcedo Studio 不保证其训练的模型可用于商业活动。主体模型（S3OD"
+          "，请联系数据集作者。X3LuminaStudio 不保证其训练的模型可用于商业活动。主体模型（S3OD"
           "）使用生成图像和来自其他数据集的标签训练，详见模型包内的 NOTICE 文件。"));
   EXPECT_EQ(QCoreApplication::translate(
                 "AiModelDownloadStatementDialog",

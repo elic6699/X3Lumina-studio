@@ -60,7 +60,7 @@ ApplicationWindow {
     visibility: !root.nativeFrameReady
                 ? Window.Hidden
                 : root.startMaximizedRequested ? Window.Maximized : Window.Windowed
-    title: qsTr("Alcedo Studio")
+    title: qsTr("X3LuminaStudio")
     flags: root.nativeFrameManagedEnabled
            ? Qt.Window | Qt.WindowTitleHint | Qt.WindowSystemMenuHint
              | Qt.WindowMinimizeButtonHint | Qt.WindowMaximizeButtonHint
@@ -320,10 +320,8 @@ ApplicationWindow {
     // (Finalize false) before the process exits. Async save must finish first —
     // quitting during Saving aborts the checkpoint. The close decision and the
     // editor finalize sequence live in C++ (appModules.applicationClose,
-    // ApplicationCloseCoordinator); this window keeps the dialog and the update
-    // install hand-off.
+    // ApplicationCloseCoordinator); this window keeps the dialog.
     property bool allowApplicationClose: false
-    property bool updateInstallPending: false
 
     // A scroll anchor names occurrences of one project's result.
     Connections {
@@ -332,15 +330,6 @@ ApplicationWindow {
 
         function onProjectChanged() {
             root.librarySectionScrollAnchor = null
-        }
-    }
-
-    Connections {
-        target: appModules.updates
-
-        function onApplicationCloseRequested() {
-            root.updateInstallPending = true
-            root.close()
         }
     }
 
@@ -365,23 +354,12 @@ ApplicationWindow {
 
     function cancelEditorCloseConfirm() {
         appModules.applicationClose.Cancel()
-        if (root.updateInstallPending) {
-            root.updateInstallPending = false
-            appModules.updates.CancelInstall()
-        }
         if (appDialogs.editorCloseConfirmDialog) {
             appDialogs.editorCloseConfirmDialog.busy = false
         }
     }
 
     function finishApplicationClose() {
-        if (root.updateInstallPending) {
-            root.updateInstallPending = false
-            if (!appModules.updates.CommitInstall()) {
-                root.abortEditorCloseSave(appModules.updates.errorText)
-                return
-            }
-        }
         root.allowApplicationClose = true
         if (appDialogs.editorCloseConfirmDialog
                 && appDialogs.editorCloseConfirmDialog.opened) {
@@ -391,10 +369,6 @@ ApplicationWindow {
     }
 
     function abortEditorCloseSave(messageText) {
-        if (root.updateInstallPending) {
-            root.updateInstallPending = false
-            appModules.updates.CancelInstall()
-        }
         if (appDialogs.editorCloseConfirmDialog) {
             appDialogs.editorCloseConfirmDialog.busy = false
             if (appDialogs.editorCloseConfirmDialog.opened) {
@@ -423,13 +397,6 @@ ApplicationWindow {
 
     onClosing: function(close) {
         if (!root.editorCloseNeedsConfirm()) {
-            if (root.updateInstallPending) {
-                root.updateInstallPending = false
-                if (!appModules.updates.CommitInstall()) {
-                    close.accepted = false
-                    root.showSnackbar(appModules.updates.errorText)
-                }
-            }
             return
         }
         close.accepted = false
@@ -541,10 +508,6 @@ ApplicationWindow {
 
     function openLutImportDialog() {
         appDialogs.openLutImportDialog()
-    }
-
-    function openUpdateSettings() {
-        appDialogs.openUpdateSettings()
     }
 
     function openLutSettings() {

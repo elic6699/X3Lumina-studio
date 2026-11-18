@@ -1,7 +1,7 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Build Windows installer packages (WiX MSI / NSIS EXE) for Alcedo Studio.
+    Build Windows installer packages (WiX MSI / NSIS EXE) for X3LuminaStudio.
 .DESCRIPTION
     This script automates the CMake install + CPack workflow on Windows.
     It detects available packaging tools and prints installation hints if they are missing.
@@ -130,7 +130,7 @@ function Resolve-DuckDbExtension {
 }
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Alcedo Studio Windows Packager" -ForegroundColor Cyan
+Write-Host "  X3LuminaStudio Windows Packager" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -211,7 +211,7 @@ Invoke-InstallTreeVerification -Directory $installDir
 # ------------------------------------------------------------------
 New-Item -ItemType Directory -Force -Path $PackageOutDir | Out-Null
 $legacyZipPackages = Get-ChildItem -LiteralPath $PackageOutDir `
-    -Filter "AlcedoStudio-*-Windows-*.zip" -File -ErrorAction SilentlyContinue
+    -Filter "X3LuminaStudio-*-Windows-*.zip" -File -ErrorAction SilentlyContinue
 foreach ($legacyZipPackage in $legacyZipPackages) {
     Write-Host "Removing legacy Windows ZIP: $($legacyZipPackage.Name)" -ForegroundColor Gray
     Remove-Item -LiteralPath $legacyZipPackage.FullName -Force

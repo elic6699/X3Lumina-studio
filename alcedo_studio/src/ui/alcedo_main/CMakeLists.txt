@@ -852,8 +852,6 @@ set(ALCEDO_MAIN_QML_FILES
     "${ALCEDO_UI_SHELL_ROOT}/qml/WelcomeProjectOverview.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/WelcomeProjectPreviewAdapter.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/WelcomeRecentProjectList.qml"
-    "${ALCEDO_UI_SHELL_ROOT}/qml/UpdateNotice.qml"
-    "${ALCEDO_UI_SHELL_ROOT}/qml/UpdatesSettingsPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/LutSettingsPanel.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/CameraProfileFolderTile.qml"
     "${ALCEDO_UI_SHELL_ROOT}/qml/DisplayProfileTile.qml"

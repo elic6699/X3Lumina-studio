@@ -348,7 +348,6 @@ Item {
         currentLanguageIndex: host.languageIndexForCode(languageManager.currentLanguageCode)
         acceleratorWarning: appModules.project.acceleratorWarning
         serviceMessage: appModules.project.serviceMessage
-        updateService: appModules.updates
         // A row previews that project under the welcome surface; the upper
         // area shows the skeleton until the load completes.
         onPreviewRequested: function(projectPath) {
@@ -397,10 +396,6 @@ Item {
     function openSettingsDialog(category) {
         settingsDialogObj.requestedCategory = category === undefined ? 0 : category
         settingsDialogObj.open()
-    }
-
-    function openUpdateSettings() {
-        openSettingsDialog(settingsDialogObj.updatesCategory)
     }
 
     function openLutSettings() {

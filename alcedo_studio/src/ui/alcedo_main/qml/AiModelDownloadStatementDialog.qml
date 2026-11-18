@@ -73,7 +73,7 @@ Popup {
             objectName: "aiModelDownloadStatementGeneral"
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("The AI models on this page are not part of the Alcedo Studio installer. Alcedo Studio downloads them to this computer from third-party sites or from the Alcedo download server. Each model has its own license. The license names are on the model cards, and the AI Mask package contains the full license texts. You decide whether the models and their output can be used for your purpose, including commercial use.")
+            text: qsTr("The AI models on this page are not part of the X3LuminaStudio installer. X3LuminaStudio downloads them to this computer from third-party sites or from the X3LuminaStudio download server. Each model has its own license. The license names are on the model cards, and the AI Mask package contains the full license texts. You decide whether the models and their output can be used for your purpose, including commercial use.")
             color: appTheme.textMutedColor
             font.family: appTheme.uiFontFamily
             font.pixelSize: appTheme.fontSizeBody
@@ -94,7 +94,7 @@ Popup {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             textFormat: Text.StyledText
-            text: qsTr("The Sky model and the people and sky locator are trained by Alcedo Studio. The Sky model is trained on the MaSS13K dataset (%1), which does not state a clear license. For commercial use of the Sky model or its output, contact the authors of the dataset. Alcedo Studio does not guarantee that the models it trains can be used for commercial work. The Subject model (S3OD) is trained on generated images and on labels from other datasets; see the NOTICE file of the package.")
+            text: qsTr("The Sky model and the people and sky locator are trained by X3LuminaStudio. The Sky model is trained on the MaSS13K dataset (%1), which does not state a clear license. For commercial use of the Sky model or its output, contact the authors of the dataset. X3LuminaStudio does not guarantee that the models it trains can be used for commercial work. The Subject model (S3OD) is trained on generated images and on labels from other datasets; see the NOTICE file of the package.")
                   .arg("<a href=\"" + root.datasetUrl + "\">" + root.datasetUrl + "</a>")
             linkColor: appTheme.textColor
             color: appTheme.textMutedColor

@@ -86,7 +86,7 @@ Popup {
             objectName: "lockedNodeMaskPromptBody"
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: qsTr("The default adjustment node applies Alcedo's default adjustments, so it is locked. "
+            text: qsTr("The default adjustment node applies X3LuminaStudio's default adjustments, so it is locked. "
                        + "A Mask drawn on it also limits those default adjustments to the masked area, "
                        + "which differs from traditional editing software.\n\n"
                        + "Create a new layer above it and draw the Mask there?")

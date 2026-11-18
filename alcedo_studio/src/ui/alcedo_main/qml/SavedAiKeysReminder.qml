@@ -18,6 +18,6 @@ QtObject {
             return
         }
         reminder.shown = true
-        reminder.host.showSnackbar(qsTr("Alcedo Studio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings > Saved AI Keys."))
+        reminder.host.showSnackbar(qsTr("X3LuminaStudio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings > Saved AI Keys."))
     }
 }

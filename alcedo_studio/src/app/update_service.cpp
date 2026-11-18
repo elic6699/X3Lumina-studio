@@ -273,13 +273,13 @@ void UpdateService::HandleManifest(QByteArray manifest_bytes, QByteArray signatu
       manifest_->build > static_cast<quint64>(ALCEDO_BUILD_NUMBER);
   if (install_allowed() && !newer_than_local) {
     deferred_ = false;
-    SetState(State::UpToDate, tr("Alcedo Studio is up to date."));
+    SetState(State::UpToDate, tr("X3LuminaStudio is up to date."));
     return;
   }
 
   deferred_ = false;
   SetState(State::Available,
-           tr("Alcedo Studio %1 is available.").arg(available_version()));
+           tr("X3LuminaStudio %1 is available.").arg(available_version()));
   emit offerReady();
 }
 
@@ -313,7 +313,7 @@ void UpdateService::DownloadUpdate() {
     Fail(tr("Another download is already running. Wait for it to finish and try again."));
     return;
   }
-  SetState(State::Downloading, tr("Downloading Alcedo Studio %1…").arg(available_version()));
+  SetState(State::Downloading, tr("Downloading X3LuminaStudio %1…").arg(available_version()));
 }
 
 void UpdateService::CancelDownload() {
@@ -337,7 +337,7 @@ void UpdateService::FinishPackageDownload(const QString& partial_path) {
   downloaded_bytes_text_ = FormatBytes(manifest_->artifact.size, manifest_->artifact.size);
   download_speed_text_.clear();
   download_eta_text_.clear();
-  SetState(State::Ready, tr("Alcedo Studio %1 is ready to install.").arg(available_version()));
+  SetState(State::Ready, tr("X3LuminaStudio %1 is ready to install.").arg(available_version()));
 }
 
 void UpdateService::ResetPackageDownload() {
@@ -385,7 +385,7 @@ void UpdateService::InstallUpdate() {
   if (!QFileInfo(current_bundle.absoluteDir().absolutePath()).isWritable()) {
     QDesktopServices::openUrl(QUrl::fromLocalFile(package_path_));
     Fail(
-        tr("Alcedo Studio cannot replace the app in this folder. The update ZIP was opened for "
+        tr("X3LuminaStudio cannot replace the app in this folder. The update ZIP was opened for "
            "manual installation."));
     return;
   }
@@ -437,7 +437,7 @@ void UpdateService::InstallUpdate() {
       QStringLiteral("--install-path"),   CurrentInstallPath(),
       QStringLiteral("--app-executable"), QCoreApplication::applicationFilePath()};
 
-  SetState(State::Installing, tr("Alcedo Studio will close and install the update."));
+  SetState(State::Installing, tr("X3LuminaStudio will close and install the update."));
   emit applicationCloseRequested();
 }
 
@@ -463,7 +463,7 @@ void UpdateService::CancelInstall() {
   }
   staged_helper_.clear();
   installer_arguments_.clear();
-  SetState(State::Ready, tr("Alcedo Studio %1 is ready to install.").arg(available_version()));
+  SetState(State::Ready, tr("X3LuminaStudio %1 is ready to install.").arg(available_version()));
 }
 
 void UpdateService::DeferUpdate() {

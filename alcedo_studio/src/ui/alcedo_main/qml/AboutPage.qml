@@ -13,7 +13,6 @@ import QtQuick.Layouts
 // - Row 3: the acknowledgements and components of README.md "Acknowledgments", one row per
 //   subject with its source links, and the trademark notice. AboutAcknowledgementsTest checks
 //   that every link of that README section is on this page.
-// Software updates live in UpdatesSettingsPanel.qml.
 ColumnLayout {
     id: page
     objectName: "aboutPage"
@@ -117,25 +116,11 @@ ColumnLayout {
                 Row {
                     objectName: "aboutWordmark"
                     Accessible.role: Accessible.StaticText
-                    Accessible.name: qsTr("Alcedo Studio")
+                    Accessible.name: qsTr("X3LuminaStudio")
 
                     Label {
-                        text: qsTr("Alcedo")
+                        text: qsTr("X3LuminaStudio")
                         color: appTheme.accentColor
-                        font.family: appTheme.headlineFontFamily
-                        font.pixelSize: appTheme.fontSizeHeadline
-                        font.weight: appTheme.fontWeightHeading
-                        Accessible.ignored: true
-                    }
-                    Label {
-                        text: " "
-                        font.family: appTheme.headlineFontFamily
-                        font.pixelSize: appTheme.fontSizeHeadline
-                        Accessible.ignored: true
-                    }
-                    Label {
-                        text: qsTr("Studio")
-                        color: appTheme.textColor
                         font.family: appTheme.headlineFontFamily
                         font.pixelSize: appTheme.fontSizeHeadline
                         font.weight: appTheme.fontWeightHeading
@@ -372,7 +357,7 @@ ColumnLayout {
                 objectName: "aboutTrademarkNotice"
                 Layout.fillWidth: true
                 Layout.topMargin: appTheme.spaceMd
-                text: qsTr("ACES is a trademark of the Academy of Motion Picture Arts and Sciences (A.M.P.A.S.). Alcedo Studio is an independent project and is not affiliated with, certified, or endorsed by A.M.P.A.S., Academy Software Foundation, Jed Smith, or any other upstream authors mentioned above. These names are used solely to identify the respective technologies. Film stock names such as Kodak and Fujifilm are trademarks of their owners and identify the films that Film Print simulates.")
+                text: qsTr("ACES is a trademark of the Academy of Motion Picture Arts and Sciences (A.M.P.A.S.). X3LuminaStudio is an independent project and is not affiliated with, certified, or endorsed by A.M.P.A.S., Academy Software Foundation, Jed Smith, or any other upstream authors mentioned above. These names are used solely to identify the respective technologies. Film stock names such as Kodak and Fujifilm are trademarks of their owners and identify the films that Film Print simulates.")
                 color: appTheme.textMutedColor
                 font.family: appTheme.uiFontFamily
                 font.pixelSize: appTheme.fontSizeBody

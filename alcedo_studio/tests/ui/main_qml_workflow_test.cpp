@@ -183,15 +183,8 @@ TEST_F(MainQmlWorkflowTests, ProductionWindowLoadsAndRoutesCoreWorkspaceActions)
   ASSERT_NE(settings, nullptr);
   ASSERT_TRUE(QMetaObject::invokeMethod(settings, "open"));
   EXPECT_TRUE(settings->property("visible").toBool());
-  settings->setProperty("currentCategory", 6);
-  ProcessEvents(50);
-  auto* updates_panel = settings->findChild<QObject*>(QStringLiteral("updatesSettingsPanel"));
-  ASSERT_NE(updates_panel, nullptr);
-  auto* update_status = settings->findChild<QObject*>(QStringLiteral("updatesStatusLabel"));
-  ASSERT_NE(update_status, nullptr);
-  EXPECT_TRUE(update_status->property("visible").toBool());
-  EXPECT_FALSE(update_status->property("text").toString().trimmed().isEmpty());
-  settings->setProperty("currentCategory", 11);  // About
+  EXPECT_EQ(settings->findChild<QObject*>(QStringLiteral("updatesSettingsPanel")), nullptr);
+  settings->setProperty("currentCategory", 9);  // About
   ProcessEvents(50);
   auto* build_label = settings->findChild<QObject*>(QStringLiteral("aboutBuildLabel"));
   ASSERT_NE(build_label, nullptr);
@@ -350,12 +343,12 @@ TEST_F(MainQmlWorkflowTests, SettingsDoneDoesNotOverwriteCommittedShortcutChange
                                                   QStringLiteral("ShortcutRegistry"));
   ASSERT_NE(registry, nullptr);
 
-  ASSERT_TRUE(QMetaObject::invokeMethod(root, "openSettingsDialog", Q_ARG(QVariant, QVariant(7))));
+  ASSERT_TRUE(QMetaObject::invokeMethod(root, "openSettingsDialog", Q_ARG(QVariant, QVariant(6))));
   ProcessEvents(100);
   auto* settings = root->findChild<QObject*>(QStringLiteral("settingsDialog"));
   ASSERT_NE(settings, nullptr);
   ASSERT_TRUE(settings->property("visible").toBool());
-  EXPECT_EQ(settings->property("currentCategory").toInt(), 7);
+  EXPECT_EQ(settings->property("currentCategory").toInt(), 6);
 
   // Commit a real capture through the production field.
   auto* field =
@@ -438,7 +431,7 @@ TEST_F(MainQmlWorkflowTests, TextInputAndCapturePriorityPreventProductCommandAct
 
   // An active capture row owns the same chord: Ctrl+A becomes the pending
   // candidate instead of activating the library command.
-  ASSERT_TRUE(QMetaObject::invokeMethod(root, "openSettingsDialog", Q_ARG(QVariant, QVariant(7))));
+  ASSERT_TRUE(QMetaObject::invokeMethod(root, "openSettingsDialog", Q_ARG(QVariant, QVariant(6))));
   ProcessEvents(100);
   auto* settings = root->findChild<QObject*>(QStringLiteral("settingsDialog"));
   ASSERT_NE(settings, nullptr);

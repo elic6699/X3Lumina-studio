@@ -415,7 +415,7 @@ TEST(SavedAiKeysPanelQmlTest, LaunchReminderShowsOnceWhileACredentialIsSaved) {
 
   EXPECT_EQ(harness.Messages(),
             QStringList{QStringLiteral(
-                "Alcedo Studio still holds AI keys that you saved for Advanced Content Analysis, "
+                "X3LuminaStudio still holds AI keys that you saved for Advanced Content Analysis, "
                 "which this version removes. Delete them in Settings > Saved AI Keys.")});
 }
 

@@ -157,7 +157,7 @@ auto InstallMac(const QString& package_path, const QString& bundle_path) -> int 
   if (!parent.rename(current_info.fileName(), backup_name)) {
     StartApplication(bundle_path);
     return WriteFailure(package_path,
-                        QStringLiteral("The app location is not writable. Move Alcedo Studio to a "
+                        QStringLiteral("The app location is not writable. Move X3LuminaStudio to a "
                                        "user-writable folder or install the update manually."));
   }
 

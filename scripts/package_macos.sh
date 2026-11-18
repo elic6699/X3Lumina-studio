@@ -8,7 +8,7 @@ preset="macos_release"
 build_dir="${repo_root}/build/macos-release"
 install_dir="${repo_root}/build/install"
 package_out_dir="${repo_root}/build/macos-release/package"
-bundle_name="AlcedoStudio"
+bundle_name="X3LuminaStudio"
 jobs="8"
 qt_prefix=""
 require_metal_assets=1
@@ -25,14 +25,14 @@ usage() {
   cat <<USAGE
 Usage: $0 [options]
 
-Build and package the macOS Alcedo Studio .app, DMG, and ZIP.
+Build and package the macOS X3LuminaStudio .app, DMG, and ZIP.
 
 Options:
   --preset NAME              CMake configure/build preset (default: macos_release)
   --build-dir PATH           Build directory (default: build/macos-release)
   --install-dir PATH         CMake install prefix (default: build/install)
   --package-out-dir PATH     CPack output directory (default: build/macos-release/package)
-  --bundle-name NAME         App bundle/executable name (default: AlcedoStudio)
+  --bundle-name NAME         App bundle/executable name (default: X3LuminaStudio)
   --qt-prefix PATH           Qt prefix containing bin/, lib/cmake/Qt6, plugins/, qml/
   --codesign-identity ID     macOS signing identity (default: '-' for ad-hoc; empty disables signing)
   --codesign-options VALUE   Semicolon-separated codesign options (default: empty for ad-hoc)
@@ -232,7 +232,7 @@ for model in bayer.safetensors xtrans.safetensors; do
 done
 
 echo "========================================"
-echo "  Alcedo Studio macOS Packager"
+echo "  X3LuminaStudio macOS Packager"
 echo "========================================"
 echo
 echo "DuckDB VSS extension: ${ALCEDO_DUCKDB_VSS_EXTENSION}"

@@ -6,7 +6,7 @@
 // ApplicationModuleHost:
 // - Open Log Folder opens the log directory through the LogFolderController stand-in.
 // - Every Text and Label of every Settings page uses a theme size token and no weight above 600
-//   (the Alcedo Studio wordmark of About keeps its heading weight).
+//   (the X3LuminaStudio wordmark of About keeps its heading weight).
 // - The acknowledgements of About list every link of README.md "Acknowledgments".
 // Buttons are activated through their `clicked` signal (offscreen pointer delivery into the
 // dialog's scrolled page is not reliable, AGENTS.md).
@@ -46,8 +46,8 @@
 namespace alcedo::ui::test {
 namespace {
 
-constexpr int kSettingsCategoryCount = 12;
-constexpr int kAboutCategory         = 11;
+constexpr int kSettingsCategoryCount = 11;
+constexpr int kAboutCategory         = 9;
 
 void          ProcessEvents(int milliseconds = 40) {
   QEventLoop loop;

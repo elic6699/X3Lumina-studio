@@ -50,11 +50,10 @@ Dialog {
     property bool revealColorLabelsOnOpen: false
     // Category indices used by callers outside this dialog.
     readonly property int colorLabelsCategory: 0
-    readonly property int updatesCategory: 6
     // LUTs and Color Management: the LUT library and the DCP camera profile folder.
-    readonly property int lutCategory: 8
-    readonly property int aiModelsCategory: 9
-    readonly property int aboutCategory: 10
+    readonly property int lutCategory: 7
+    readonly property int aiModelsCategory: 8
+    readonly property int aboutCategory: 9
     // The AI Models page checks the signed AI model feed once per Settings opening, when it is
     // first shown (AI Models plan, P6).
     property bool aiModelFeedCheckedThisOpening: false
@@ -203,9 +202,6 @@ Dialog {
             return qsTr("Acceleration")
         }
         if (currentCategory === 6) {
-            return qsTr("Updates")
-        }
-        if (currentCategory === 7) {
             return qsTr("Keyboard")
         }
         if (currentCategory === lutCategory) {
@@ -222,7 +218,7 @@ Dialog {
             return qsTr("The AI model runs on this computer, and no photo is uploaded. The labeling speed depends on the CPU, the GPU, and the disk.")
         }
         if (currentCategory === 4) {
-            return qsTr("高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；Alcedo Studio 不会保留任何内容。\n\n这个设置界面的灵感来自 ccswitch，使用方式也类似。")
+            return qsTr("高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；X3LuminaStudio 不会保留任何内容。\n\n这个设置界面的灵感来自 ccswitch，使用方式也类似。")
         }
         return ""
     }
@@ -465,7 +461,6 @@ Dialog {
                                         { label: qsTr("Local Content Recognition"), icon: "qrc:/panel_icons/search.svg" },
                                         { label: qsTr("Saved AI Keys"), icon: "qrc:/panel_icons/flask.svg" },
                                         { label: qsTr("Acceleration"), icon: "qrc:/panel_icons/cpu.svg" },
-                                        { label: qsTr("Updates"), icon: "qrc:/panel_icons/update.svg" },
                                         { label: qsTr("Keyboard"), icon: "qrc:/panel_icons/keyboard.svg" },
                                         { label: qsTr("LUTs and Color Management"), icon: "qrc:/panel_icons/lut-cube.svg" },
                                         { label: qsTr("AI Models"), icon: "qrc:/panel_icons/sparkles.svg" },
@@ -519,19 +514,6 @@ Dialog {
                                                 wrapMode: Text.Wrap
                                             }
 
-                                            Rectangle {
-                                                Layout.preferredWidth: 8
-                                                Layout.preferredHeight: 8
-                                                Layout.alignment: Qt.AlignVCenter
-                                                radius: 4
-                                                visible: index === dialog.updatesCategory
-                                                         && appModules.updates
-                                                         && (appModules.updates.updateDeferred
-                                                             || appModules.updates.updateAvailable)
-                                                color: appTheme.backgroundTaskFinishedColor
-                                                Accessible.name: qsTr("Update available")
-                                                Accessible.role: Accessible.Indicator
-                                            }
                                         }
 
                                         MouseArea {
@@ -824,7 +806,7 @@ Dialog {
                                         Label {
                                             Layout.fillWidth: true
                                             Layout.leftMargin: 176
-                                            text: qsTr("The default adjustment node applies Alcedo's default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.")
+                                            text: qsTr("The default adjustment node applies X3LuminaStudio's default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.")
                                             wrapMode: Text.WordWrap
                                             color: dialog.mutedTextColor
                                             font.pixelSize: appTheme.fontSizeBody
@@ -968,7 +950,7 @@ Dialog {
                                             Layout.fillWidth: true
                                             Layout.leftMargin: 176
                                             visible: dialog.acceleratorRestartHintVisible
-                                            text: qsTr("Restart Alcedo yourself to apply this backend change.")
+                                            text: qsTr("Restart X3LuminaStudio yourself to apply this backend change.")
                                             wrapMode: Text.WordWrap
                                             color: dialog.mutedTextColor
                                             font.pixelSize: appTheme.fontSizeBody
@@ -989,21 +971,6 @@ Dialog {
                                         }
                                     }
                                 }
-                            }
-                        }
-
-                        ScrollView {
-                            id: updatesScroll
-                            contentWidth: availableWidth
-                            clip: true
-
-                            UpdatesSettingsPanel {
-                                Layout.fillWidth: true
-                                updateService: appModules.updates
-                                textColor: dialog.textColor
-                                mutedTextColor: dialog.mutedTextColor
-                                dividerColor: dialog.dividerColor
-                                dataFontFamily: dialog.dataFontFamily
                             }
                         }
 

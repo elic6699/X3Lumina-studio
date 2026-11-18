@@ -51,7 +51,7 @@ auto IsExcludedSourceIfd0Tag(uint16_t tag) -> bool {
   if (IsExifImageStructureTag(tag)) return true;
   switch (tag) {
     case 0x0112:  // Orientation: the exported pixels are upright.
-    case 0x0131:  // Software: the export writes Alcedo.
+    case 0x0131:  // Software: the export writes X3LuminaStudio.
     case 0x02BC:  // XMP packet
     case 0x4746:  // Rating: the export writes the current rating.
     case 0x4749:  // RatingPercent

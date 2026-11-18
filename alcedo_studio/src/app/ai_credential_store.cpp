@@ -26,7 +26,7 @@ namespace alcedo {
 namespace {
 
 #if defined(_WIN32)
-// All Alcedo AI credentials live under this prefix so they are easy to audit
+// All X3LuminaStudio AI credentials live under this prefix so they are easy to audit
 // and do not collide with other applications in the OS store. The full target
 // name is `AlcedoStudio/AiCredential/<slot>`.
 constexpr const char* kTargetPrefix = "AlcedoStudio/AiCredential/";
@@ -244,7 +244,7 @@ auto ProtectSecret(const std::string& secret, std::vector<unsigned char>* encryp
   input.cbData = static_cast<DWORD>(secret.size());
 
   DATA_BLOB output{};
-  if (!CryptProtectData(&input, L"Alcedo Studio AI credential", nullptr, nullptr, nullptr,
+  if (!CryptProtectData(&input, L"X3LuminaStudio AI credential", nullptr, nullptr, nullptr,
                         CRYPTPROTECT_UI_FORBIDDEN, &output)) {
     if (error) *error = "CryptProtectData failed (code " + std::to_string(GetLastError()) + ")";
     return false;
@@ -472,7 +472,7 @@ auto WinCredAiCredentialStore::HasCredential(const std::string& slot) -> bool {
 
 namespace {
 
-// All Alcedo AI credentials on macOS live under this service label so they are
+// All X3LuminaStudio AI credentials on macOS live under this service label so they are
 // easy to audit and do not collide with other applications in the keychain. The
 // item is keyed by (service = kMacService, account = <slot>), matching the
 // Windows `AlcedoStudio/AiCredential/<slot>` target naming.

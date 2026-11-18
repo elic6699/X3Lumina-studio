@@ -81,7 +81,7 @@ Commands:
   session prune                   Remove the stale session records. Keep every other file
                                   and report why it was skipped.
   watch                           Print notifications until interrupted.
-  version                         Print the Alcedo Studio version. Also: --version.
+  version                         Print the X3LuminaStudio version. Also: --version.
   help                            Print this text.
 
 Exit codes: 0 success, 1 command error, 2 session selection error, 3 connection error,
@@ -768,7 +768,7 @@ auto RunSessionList(const CliOptions& options) -> int {
   return Exit(CliExitCode::Success);
 }
 
-/// Removes only the files that hold a stale Alcedo session record. A file that cannot be read or
+/// Removes only the files that hold a stale X3LuminaStudio session record. A file that cannot be read or
 /// is not a session record may belong to another program, so it is kept and reported.
 auto RunSessionPrune(const CliOptions& options) -> int {
   QJsonArray removed;

@@ -5,13 +5,13 @@
     <name>AboutPage</name>
     <message>
         <location filename="../qml/AboutPage.qml" line="+82"/>
-        <source>Welcome to Alcedo Studio</source>
-        <translation>欢迎使用 Alcedo Studio</translation>
+        <source>Welcome to X3LuminaStudio</source>
+        <translation>欢迎使用 X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+10"/>
-        <source>The documentation walks you through importing, editing, and managing your photos step by step. Follow development on GitHub, and if Alcedo Studio is useful to you, consider supporting it with a donation.</source>
-        <translation>文档会一步步带你了解如何导入、编辑和管理照片。你可以在 GitHub 上关注开发进展；如果 Alcedo Studio 对你有帮助，也欢迎捐赠支持。</translation>
+        <source>The documentation walks you through importing, editing, and managing your photos step by step. Follow development on GitHub, and if X3LuminaStudio is useful to you, consider supporting it with a donation.</source>
+        <translation>文档会一步步带你了解如何导入、编辑和管理照片。你可以在 GitHub 上关注开发进展；如果 X3LuminaStudio 对你有帮助，也欢迎捐赠支持。</translation>
     </message>
     <message>
         <location line="+17"/>
@@ -35,8 +35,8 @@
     </message>
     <message>
         <location line="+11"/>
-        <source>Alcedo Studio</source>
-        <translation>Alcedo Studio</translation>
+        <source>X3LuminaStudio</source>
+        <translation>X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+9"/>
@@ -85,8 +85,8 @@
     </message>
     <message>
         <location line="+11"/>
-        <source>Alcedo Studio builds on research, open-source implementations, and community data from the wider imaging ecosystem:</source>
-        <translation>Alcedo Studio 建立在更广泛的成像生态中的研究、开源实现与社区数据之上：</translation>
+        <source>X3LuminaStudio builds on research, open-source implementations, and community data from the wider imaging ecosystem:</source>
+        <translation>X3LuminaStudio 建立在更广泛的成像生态中的研究、开源实现与社区数据之上：</translation>
     </message>
     <message>
         <location line="+10"/>
@@ -148,8 +148,8 @@
         <translation>AI 模型</translation>
     </message>
     <message>
-        <source>Alcedo Studio downloads the AI models of Settings &gt; AI Models to this computer. Each model has its own license.</source>
-        <translation>Alcedo Studio 会将“设置 &gt; AI 模型”中的 AI 模型下载到本机。每个模型都有其自身的许可证。</translation>
+        <source>X3LuminaStudio downloads the AI models of Settings &gt; AI Models to this computer. Each model has its own license.</source>
+        <translation>X3LuminaStudio 会将“设置 &gt; AI 模型”中的 AI 模型下载到本机。每个模型都有其自身的许可证。</translation>
     </message>
     <message>
         <source>AI model download statement</source>
@@ -236,10 +236,6 @@
         <translation>界面</translation>
     </message>
     <message>
-        <source>Alcedo</source>
-        <translation>Alcedo</translation>
-    </message>
-    <message>
         <source>Studio</source>
         <translation>Studio</translation>
     </message>
@@ -288,8 +284,8 @@
         <translation>组件</translation>
     </message>
     <message>
-        <source>ACES is a trademark of the Academy of Motion Picture Arts and Sciences (A.M.P.A.S.). Alcedo Studio is an independent project and is not affiliated with, certified, or endorsed by A.M.P.A.S., Academy Software Foundation, Jed Smith, or any other upstream authors mentioned above. These names are used solely to identify the respective technologies. Film stock names such as Kodak and Fujifilm are trademarks of their owners and identify the films that Film Print simulates.</source>
-        <translation>ACES 是美国电影艺术与科学学院（A.M.P.A.S.）的商标。Alcedo Studio 是独立项目，与 A.M.P.A.S.、Academy Software Foundation、Jed Smith 及上述其他上游作者均无关联，也未获其认证或认可。这些名称仅用于标识相应技术。Kodak、Fujifilm 等胶片名称是其所有者的商标，用于标识胶片印片所模拟的胶片。</translation>
+        <source>ACES is a trademark of the Academy of Motion Picture Arts and Sciences (A.M.P.A.S.). X3LuminaStudio is an independent project and is not affiliated with, certified, or endorsed by A.M.P.A.S., Academy Software Foundation, Jed Smith, or any other upstream authors mentioned above. These names are used solely to identify the respective technologies. Film stock names such as Kodak and Fujifilm are trademarks of their owners and identify the films that Film Print simulates.</source>
+        <translation>ACES 是美国电影艺术与科学学院（A.M.P.A.S.）的商标。X3LuminaStudio 是独立项目，与 A.M.P.A.S.、Academy Software Foundation、Jed Smith 及上述其他上游作者均无关联，也未获其认证或认可。这些名称仅用于标识相应技术。Kodak、Fujifilm 等胶片名称是其所有者的商标，用于标识胶片印片所模拟的胶片。</translation>
     </message>
 </context>
 <context>
@@ -856,8 +852,8 @@
     </message>
     <message>
         <location line="+21"/>
-        <source>This build does not include Codex OAuth import. Rebuild Alcedo Studio.</source>
-        <translation type="obsolete">此构建不包含 Codex OAuth 导入功能。请重新构建 Alcedo Studio。</translation>
+        <source>This build does not include Codex OAuth import. Rebuild X3LuminaStudio.</source>
+        <translation type="obsolete">此构建不包含 Codex OAuth 导入功能。请重新构建 X3LuminaStudio。</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -1098,8 +1094,8 @@
         <translation>取消</translation>
     </message>
     <message>
-        <source>Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, Alcedo Studio can no longer delete them for you.</source>
-        <translation>高级内容分析功能已从本版本中移除，下个版本将同时移除本页面。请及时删除已保存的 API 密钥和 Codex 登录。之后 Alcedo Studio 将无法再替您清除这些密钥。</translation>
+        <source>Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, X3LuminaStudio can no longer delete them for you.</source>
+        <translation>高级内容分析功能已从本版本中移除，下个版本将同时移除本页面。请及时删除已保存的 API 密钥和 Codex 登录。之后 X3LuminaStudio 将无法再替您清除这些密钥。</translation>
     </message>
     <message>
         <source>No saved keys</source>
@@ -1367,25 +1363,25 @@
     </message>
     <message>
         <location line="+1"/>
-        <source>This machine has an NVIDIA graphics card, but it does not meet Alcedo&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
+        <source>This machine has an NVIDIA graphics card, but it does not meet X3LuminaStudio&apos;s CUDA runtime requirements. CUDA requires an NVIDIA graphics driver with CUDA %1 or newer.
 
 %2
 
-Alcedo will use %3 instead.</source>
-        <translation>本机有 NVIDIA 显卡，但不满足 Alcedo 的 CUDA 运行时要求。CUDA 需要兼容 CUDA %1 或更新版本的 NVIDIA 显卡驱动。
+X3LuminaStudio will use %3 instead.</source>
+        <translation>本机有 NVIDIA 显卡，但不满足 X3LuminaStudio 的 CUDA 运行时要求。CUDA 需要兼容 CUDA %1 或更新版本的 NVIDIA 显卡驱动。
 
 %2
 
-Alcedo 将改用 %3。</translation>
+X3LuminaStudio 将改用 %3。</translation>
     </message>
     <message>
         <location line="+4"/>
         <source>CUDA acceleration is not supported on this machine because no NVIDIA graphics card was detected.
 
-Alcedo will use %1 instead.</source>
+X3LuminaStudio will use %1 instead.</source>
         <translation>本机未检测到 NVIDIA 显卡，因此不支持 CUDA 加速。
 
-Alcedo 将改用 %1。</translation>
+X3LuminaStudio 将改用 %1。</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -1434,7 +1430,7 @@ Alcedo 将改用 %1。</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>The accelerator change will apply after Alcedo restarts.</source>
+        <source>The accelerator change will apply after X3LuminaStudio restarts.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2393,8 +2389,8 @@ Alcedo 将改用 %1。</translation>
     </message>
     <message>
         <location line="+153"/>
-        <source>Alcedo</source>
-        <translation>Alcedo</translation>
+        <source>X3LuminaStudio</source>
+        <translation>X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+13"/>
@@ -2645,12 +2641,12 @@ Original source files on disk will be kept.</source>
         <translation>AI 蒙版模型尚未安装。请在“设置 > AI 模型”页面下载。</translation>
     </message>
     <message>
-        <source>The installed AI Mask models are too old for this version of Alcedo Studio. Update them on the AI Models page in Settings.</source>
-        <translation>已安装的 AI 蒙版模型版本过旧，此版本的 Alcedo Studio 无法使用。请在“设置 > AI 模型”页面更新。</translation>
+        <source>The installed AI Mask models are too old for this version of X3LuminaStudio. Update them on the AI Models page in Settings.</source>
+        <translation>已安装的 AI 蒙版模型版本过旧，此版本的 X3LuminaStudio 无法使用。请在“设置 > AI 模型”页面更新。</translation>
     </message>
     <message>
-        <source>The AI Mask models need a newer version of Alcedo Studio. Update Alcedo Studio to use AI Mask.</source>
-        <translation>AI 蒙版模型需要更新版本的 Alcedo Studio。请更新 Alcedo Studio 后使用 AI 蒙版。</translation>
+        <source>The AI Mask models need a newer version of X3LuminaStudio. Update X3LuminaStudio to use AI Mask.</source>
+        <translation>AI 蒙版模型需要更新版本的 X3LuminaStudio。请更新 X3LuminaStudio 后使用 AI 蒙版。</translation>
     </message>
     <message>
         <source>The installed AI Mask models are incomplete. Repair them on the AI Models page in Settings.</source>
@@ -6621,10 +6617,10 @@ Refresh the library afterwards; they are listed under the User category. Import 
         <translation>在锁定节点上添加蒙版？</translation>
     </message>
     <message>
-        <source>The default adjustment node applies Alcedo&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those default adjustments to the masked area, which differs from traditional editing software.
+        <source>The default adjustment node applies X3LuminaStudio&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those default adjustments to the masked area, which differs from traditional editing software.
 
 Create a new layer above it and draw the Mask there?</source>
-        <translation>默认调整节点会应用 Alcedo 的一些默认调整，因此该节点默认处于锁定状态。在该节点上绘制的蒙版也会把这些默认调整限制在蒙版区域内，这与传统软件逻辑不同。
+        <translation>默认调整节点会应用 X3LuminaStudio 的一些默认调整，因此该节点默认处于锁定状态。在该节点上绘制的蒙版也会把这些默认调整限制在蒙版区域内，这与传统软件逻辑不同。
 
 是否在其上方新建一个图层，并在新图层上绘制蒙版？</translation>
     </message>
@@ -7050,8 +7046,8 @@ Create a new layer above it and draw the Mask there?</source>
     </message>
     <message>
         <location filename="../qml/Main.qml" line="+48"/>
-        <source>Alcedo Studio</source>
-        <translation>Alcedo Studio</translation>
+        <source>X3LuminaStudio</source>
+        <translation>X3LuminaStudio</translation>
     </message>
     <message>
         <location line="+292"/>
@@ -7212,8 +7208,8 @@ Create a new layer above it and draw the Mask there?</source>
 <context>
     <name>SavedAiKeysReminder</name>
     <message>
-        <source>Alcedo Studio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings &gt; Saved AI Keys.</source>
-        <translation>Alcedo Studio 仍保存着您为高级内容分析保存的 AI 密钥，本版本已移除该功能。请在“设置 &gt; 已保存的 AI 密钥”中删除。</translation>
+        <source>X3LuminaStudio still holds AI keys that you saved for Advanced Content Analysis, which this version removes. Delete them in Settings &gt; Saved AI Keys.</source>
+        <translation>X3LuminaStudio 仍保存着您为高级内容分析保存的 AI 密钥，本版本已移除该功能。请在“设置 &gt; 已保存的 AI 密钥”中删除。</translation>
     </message>
 </context>
 <context>
@@ -7799,10 +7795,10 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+3"/>
-        <source>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；Alcedo Studio 不会保留任何内容。
+        <source>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；X3LuminaStudio 不会保留任何内容。
 
 这个设置界面的灵感来自 ccswitch，使用方式也类似。</source>
-        <translation>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；Alcedo Studio 不会保留任何内容。
+        <translation>高级内容识别会通过你配置的 Anthropic / OpenAI 兼容提供商，与指定 agent 交互来识别图像内容并进行评分。数据保留、隐私与合规政策请咨询你使用的 AI 提供商；X3LuminaStudio 不会保留任何内容。
 
 这个设置界面的灵感来自 ccswitch，使用方式也类似。</translation>
     </message>
@@ -7873,8 +7869,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+21"/>
-        <source>Restart Alcedo yourself to apply this backend change.</source>
-        <translation>请自行重启 Alcedo，以使此后端更改生效。</translation>
+        <source>Restart X3LuminaStudio yourself to apply this backend change.</source>
+        <translation>请自行重启 X3LuminaStudio，以使此后端更改生效。</translation>
     </message>
     <message>
         <source>Language / Theme</source>
@@ -7905,8 +7901,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
         <translation>在当前节点上绘制</translation>
     </message>
     <message>
-        <source>The default adjustment node applies Alcedo&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.</source>
-        <translation>默认调整节点会应用 Alcedo 的一些默认调整，因此该节点默认处于锁定状态。在该节点上绘制的蒙版也会把这些默认调整限制在蒙版区域内。你自行添加的图层不会被锁定，也不受此设置影响。</translation>
+        <source>The default adjustment node applies X3LuminaStudio&apos;s default adjustments, so it is locked. A Mask drawn on it also limits those defaults to the masked area. Layers you add yourself are not locked and are never affected by this setting.</source>
+        <translation>默认调整节点会应用 X3LuminaStudio 的一些默认调整，因此该节点默认处于锁定状态。在该节点上绘制的蒙版也会把这些默认调整限制在蒙版区域内。你自行添加的图层不会被锁定，也不受此设置影响。</translation>
     </message>
     <message>
         <source>AI Models</source>
@@ -8208,8 +8204,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+1"/>
-        <source>Alcedo Studio is up to date</source>
-        <translation>Alcedo Studio 已是最新版本</translation>
+        <source>X3LuminaStudio is up to date</source>
+        <translation>X3LuminaStudio 已是最新版本</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -8228,13 +8224,13 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+2"/>
-        <source>The package is verified. Install will close Alcedo Studio, replace this copy, and reopen.</source>
-        <translation>安装包已通过校验。安装会关闭 Alcedo Studio，替换当前副本，然后重新打开。</translation>
+        <source>The package is verified. Install will close X3LuminaStudio, replace this copy, and reopen.</source>
+        <translation>安装包已通过校验。安装会关闭 X3LuminaStudio，替换当前副本，然后重新打开。</translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>Alcedo Studio is closing so the installer can replace this copy.</source>
-        <translation>Alcedo Studio 即将关闭，以便安装程序替换当前副本。</translation>
+        <source>X3LuminaStudio is closing so the installer can replace this copy.</source>
+        <translation>X3LuminaStudio 即将关闭，以便安装程序替换当前副本。</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -8374,13 +8370,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="338"/>
-        <source>Alcedo Studio</source>
-        <translation>Alcedo Studio</translation>
-    </message>
-    <message>
-        <location filename="../qml/WelcomeDialog.qml" line="341"/>
-        <source>Alcedo</source>
-        <translation>Alcedo</translation>
+        <source>X3LuminaStudio</source>
+        <translation>X3LuminaStudio</translation>
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="357"/>
@@ -8410,8 +8401,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="483"/>
-        <source>Choose a folder for the project file, then import your photos. Alcedo does not move or change the original photos.</source>
-        <translation>选一个文件夹存放项目文件，然后导入照片。Alcedo 不会移动或改写原始照片。</translation>
+        <source>Choose a folder for the project file, then import your photos. X3LuminaStudio does not move or change the original photos.</source>
+        <translation>选一个文件夹存放项目文件，然后导入照片。X3LuminaStudio 不会移动或改写原始照片。</translation>
     </message>
     <message>
         <location filename="../qml/WelcomeDialog.qml" line="515"/>
@@ -8641,13 +8632,13 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+39"/>
-        <source>Alcedo Studio is up to date.</source>
-        <translation>Alcedo Studio 已是最新版本。</translation>
+        <source>X3LuminaStudio is up to date.</source>
+        <translation>X3LuminaStudio 已是最新版本。</translation>
     </message>
     <message>
         <location line="+6"/>
-        <source>Alcedo Studio %1 is available.</source>
-        <translation>Alcedo Studio %1 已发布。</translation>
+        <source>X3LuminaStudio %1 is available.</source>
+        <translation>X3LuminaStudio %1 已发布。</translation>
     </message>
     <message>
         <location line="+14"/>
@@ -8661,8 +8652,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+3"/>
-        <source>Downloading Alcedo Studio %1…</source>
-        <translation>正在下载 Alcedo Studio %1…</translation>
+        <source>Downloading X3LuminaStudio %1…</source>
+        <translation>正在下载 X3LuminaStudio %1…</translation>
     </message>
     <message>
         <location line="+11"/>
@@ -8677,8 +8668,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     <message>
         <location line="+7"/>
         <location line="+126"/>
-        <source>Alcedo Studio %1 is ready to install.</source>
-        <translation>Alcedo Studio %1 已可安装。</translation>
+        <source>X3LuminaStudio %1 is ready to install.</source>
+        <translation>X3LuminaStudio %1 已可安装。</translation>
     </message>
     <message>
         <location line="-110"/>
@@ -8697,8 +8688,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="+22"/>
-        <source>Alcedo Studio cannot replace the app in this folder. The update ZIP was opened for manual installation.</source>
-        <translation>Alcedo Studio 无法替换此文件夹中的应用。更新 ZIP 已打开，请手动安装。</translation>
+        <source>X3LuminaStudio cannot replace the app in this folder. The update ZIP was opened for manual installation.</source>
+        <translation>X3LuminaStudio 无法替换此文件夹中的应用。更新 ZIP 已打开，请手动安装。</translation>
     </message>
     <message>
         <location line="+16"/>
@@ -8718,8 +8709,8 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
     </message>
     <message>
         <location line="-12"/>
-        <source>Alcedo Studio will close and install the update.</source>
-        <translation>Alcedo Studio 将关闭并安装更新。</translation>
+        <source>X3LuminaStudio will close and install the update.</source>
+        <translation>X3LuminaStudio 将关闭并安装更新。</translation>
     </message>
 </context>
 <context>
@@ -9135,16 +9126,16 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
         <translation>下载前请阅读</translation>
     </message>
     <message>
-        <source>The AI models on this page are not part of the Alcedo Studio installer. Alcedo Studio downloads them to this computer from third-party sites or from the Alcedo download server. Each model has its own license. The license names are on the model cards, and the AI Mask package contains the full license texts. You decide whether the models and their output can be used for your purpose, including commercial use.</source>
-        <translation>本页的 AI 模型不包含在 Alcedo Studio 安装包中，由 Alcedo Studio 从第三方网站或 Alcedo 下载服务器下载到本机。每个模型都受其自身许可证约束，许可证名称见各模型卡片，AI Mask 模型包内附有许可证全文。模型及其输出能否用于您的用途（包括商业用途），请您自行判断。</translation>
+        <source>The AI models on this page are not part of the X3LuminaStudio installer. X3LuminaStudio downloads them to this computer from third-party sites or from the X3LuminaStudio download server. Each model has its own license. The license names are on the model cards, and the AI Mask package contains the full license texts. You decide whether the models and their output can be used for your purpose, including commercial use.</source>
+        <translation>本页的 AI 模型不包含在 X3LuminaStudio 安装包中，由 X3LuminaStudio 从第三方网站或 X3LuminaStudio 下载服务器下载到本机。每个模型都受其自身许可证约束，许可证名称见各模型卡片，AI Mask 模型包内附有许可证全文。模型及其输出能否用于您的用途（包括商业用途），请您自行判断。</translation>
     </message>
     <message>
         <source>AI Mask</source>
         <translation>AI Mask</translation>
     </message>
     <message>
-        <source>The Sky model and the people and sky locator are trained by Alcedo Studio. The Sky model is trained on the MaSS13K dataset (%1), which does not state a clear license. For commercial use of the Sky model or its output, contact the authors of the dataset. Alcedo Studio does not guarantee that the models it trains can be used for commercial work. The Subject model (S3OD) is trained on generated images and on labels from other datasets; see the NOTICE file of the package.</source>
-        <translation>天空模型与人物/天空定位模型由 Alcedo Studio 训练。天空模型使用 MaSS13K 数据集（%1）训练，该数据集未明确声明许可证。如需将天空模型或其输出用于商业用途，请联系数据集作者。Alcedo Studio 不保证其训练的模型可用于商业活动。主体模型（S3OD）使用生成图像和来自其他数据集的标签训练，详见模型包内的 NOTICE 文件。</translation>
+        <source>The Sky model and the people and sky locator are trained by X3LuminaStudio. The Sky model is trained on the MaSS13K dataset (%1), which does not state a clear license. For commercial use of the Sky model or its output, contact the authors of the dataset. X3LuminaStudio does not guarantee that the models it trains can be used for commercial work. The Subject model (S3OD) is trained on generated images and on labels from other datasets; see the NOTICE file of the package.</source>
+        <translation>天空模型与人物/天空定位模型由 X3LuminaStudio 训练。天空模型使用 MaSS13K 数据集（%1）训练，该数据集未明确声明许可证。如需将天空模型或其输出用于商业用途，请联系数据集作者。X3LuminaStudio 不保证其训练的模型可用于商业活动。主体模型（S3OD）使用生成图像和来自其他数据集的标签训练，详见模型包内的 NOTICE 文件。</translation>
     </message>
     <message>
         <source>Select &quot;Accept and Download&quot; to confirm that you have read this statement.</source>
@@ -9206,12 +9197,12 @@ CLIP / SigLIP 这类视觉语言模型会把图像和文字映射到同一语义
         <translation>有可用更新</translation>
     </message>
     <message>
-        <source>Update required: this version of Alcedo Studio does not support the installed models</source>
-        <translation>需要更新：当前版本的 Alcedo Studio 不支持已安装的模型</translation>
+        <source>Update required: this version of X3LuminaStudio does not support the installed models</source>
+        <translation>需要更新：当前版本的 X3LuminaStudio 不支持已安装的模型</translation>
     </message>
     <message>
-        <source>The available models need a newer version of Alcedo Studio</source>
-        <translation>可用的模型需要更新版本的 Alcedo Studio</translation>
+        <source>The available models need a newer version of X3LuminaStudio</source>
+        <translation>可用的模型需要更新版本的 X3LuminaStudio</translation>
     </message>
     <message>
         <source>Repair required: installed files differ from the package</source>

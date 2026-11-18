@@ -221,7 +221,7 @@ License text file: third_party_licenses/DINOv3-LICENSE.md
 Usage note: the license text is distributed with the weights (DINOv3 License, section 1.b.i).
 
 30) People and sky locator, Sky model (AI Mask: People and Sky)
-Upstream: trained by Alcedo Studio (alcedo-ai-mask-lab)
+Upstream: trained by X3LuminaStudio (alcedo-ai-mask-lab)
 License: GPL-3.0 (the root LICENSE of this repository, without the additional permission)
 Usage note: the people and sky locator is trained on COCO 2017 and Open Images V7. The Sky model
 is trained on MaSS13K (https://github.com/xiechenxi99/mass13k), which does not state a clear

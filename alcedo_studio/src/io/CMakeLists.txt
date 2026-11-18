@@ -27,7 +27,7 @@ endif()
 add_library(AlcedoVersion INTERFACE)
 target_include_directories(AlcedoVersion INTERFACE "${ALCEDO_INCLUDE_ROOT}")
 target_compile_definitions(AlcedoVersion INTERFACE
-    ALCEDO_APP_NAME="Alcedo Studio"
+    ALCEDO_APP_NAME="X3LuminaStudio"
     ALCEDO_APP_VERSION="${PROJECT_VERSION}"
 )
 

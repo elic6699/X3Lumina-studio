@@ -55,9 +55,9 @@ Rectangle {
         case "notInstalled":
             return qsTr("The AI Mask models are not installed. Download them on the AI Models page in Settings.")
         case "updateRequired":
-            return qsTr("The installed AI Mask models are too old for this version of Alcedo Studio. Update them on the AI Models page in Settings.")
+            return qsTr("The installed AI Mask models are too old for this version of X3LuminaStudio. Update them on the AI Models page in Settings.")
         case "needsNewerApplication":
-            return qsTr("The AI Mask models need a newer version of Alcedo Studio. Update Alcedo Studio to use AI Mask.")
+            return qsTr("The AI Mask models need a newer version of X3LuminaStudio. Update X3LuminaStudio to use AI Mask.")
         case "repairRequired":
             return qsTr("The installed AI Mask models are incomplete. Repair them on the AI Models page in Settings.")
         }

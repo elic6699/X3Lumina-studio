@@ -9,7 +9,7 @@
 // CMake sets ALCEDO_APP_NAME / ALCEDO_APP_VERSION on targets that need them
 // (writers, alcedo_main). Defaults keep the header usable in isolated builds.
 #ifndef ALCEDO_APP_NAME
-#define ALCEDO_APP_NAME "Alcedo Studio"
+#define ALCEDO_APP_NAME "X3LuminaStudio"
 #endif
 
 #ifndef ALCEDO_APP_VERSION

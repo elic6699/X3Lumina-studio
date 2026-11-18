@@ -17,12 +17,12 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "Alcedo Studio\0"
-            VALUE "FileDescription", "Alcedo Studio RAW photo editor\0"
+            VALUE "CompanyName", "X3LuminaStudio\0"
+            VALUE "FileDescription", "X3LuminaStudio RAW photo editor\0"
             VALUE "FileVersion", "@PROJECT_VERSION@\0"
             VALUE "InternalName", "alcedo_main\0"
             VALUE "OriginalFilename", "alcedo_main.exe\0"
-            VALUE "ProductName", "Alcedo Studio\0"
+            VALUE "ProductName", "X3LuminaStudio\0"
             VALUE "ProductVersion", "@PROJECT_VERSION@\0"
         END
     END

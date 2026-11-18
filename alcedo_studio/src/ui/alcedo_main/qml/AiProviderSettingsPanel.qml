@@ -177,7 +177,7 @@ Item {
         AlertBadge {
             objectName: "savedAiKeysNotice"
             Layout.fillWidth: true
-            text: qsTr("Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, Alcedo Studio can no longer delete them for you.")
+            text: qsTr("Advanced Content Analysis is removed from this version. The next version also removes this page. Delete your saved API keys and the Codex login now. After that, X3LuminaStudio can no longer delete them for you.")
         }
 
         Label {

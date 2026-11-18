@@ -121,7 +121,7 @@ auto ReadAutomationSessionFile(const QString& path, QString* error)
 
   const QJsonObject object       = document.object();
   const auto        not_a_record = [&](const QString& reason) {
-    SetError(error, QStringLiteral("'%1' is not an Alcedo session record: %2").arg(path, reason));
+    SetError(error, QStringLiteral("'%1' is not an X3LuminaStudio session record: %2").arg(path, reason));
   };
   if (!IsPositiveInteger(object.value("protocol_version"), std::numeric_limits<int>::max())) {
     not_a_record(QStringLiteral("'protocol_version' is not a positive integer"));

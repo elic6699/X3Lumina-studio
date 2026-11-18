@@ -174,8 +174,9 @@ set(ALCEDO_QT_PREFIX ""
     "Optional Qt installation prefix for macOS packaging builds (contains bin/, lib/cmake/Qt6, plugins/, and qml/).")
 if(NOT DEFINED ALCEDO_MACOS_BUNDLE_NAME OR
    "${ALCEDO_MACOS_BUNDLE_NAME}" STREQUAL "" OR
-   "${ALCEDO_MACOS_BUNDLE_NAME}" STREQUAL "PuerhLab")
-    set(ALCEDO_MACOS_BUNDLE_NAME "AlcedoStudio"
+   "${ALCEDO_MACOS_BUNDLE_NAME}" STREQUAL "PuerhLab" OR
+   "${ALCEDO_MACOS_BUNDLE_NAME}" STREQUAL "AlcedoStudio")
+    set(ALCEDO_MACOS_BUNDLE_NAME "X3LuminaStudio"
         CACHE STRING
         "Display/executable name for the packaged macOS .app bundle."
         FORCE)
@@ -1873,7 +1874,7 @@ add_custom_target(tidy
     COMMENT "Running clang-tidy on source files"
 )
 
-set(CPACK_PACKAGE_NAME "alcedo")
+set(CPACK_PACKAGE_NAME "X3LuminaStudio")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}")
 if(APPLE AND ALCEDO_MACOS_BUNDLE)
@@ -1893,14 +1894,14 @@ elseif(WIN32 AND TARGET ${ALCEDO_MAIN_BIN})
     # ------------------------------------------------------------------
     # Windows installer packaging (WIX and/or NSIS)
     # ------------------------------------------------------------------
-    set(CPACK_PACKAGE_NAME "Alcedo Studio")
-    set(CPACK_PACKAGE_VENDOR "Alcedo Studio")
-    set(CPACK_PACKAGE_INSTALL_DIRECTORY "Alcedo Studio")
-    set(CPACK_PACKAGE_FILE_NAME "AlcedoStudio-${PROJECT_VERSION}-Windows-${CMAKE_SYSTEM_PROCESSOR}")
+    set(CPACK_PACKAGE_NAME "X3LuminaStudio")
+    set(CPACK_PACKAGE_VENDOR "X3LuminaStudio")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "X3LuminaStudio")
+    set(CPACK_PACKAGE_FILE_NAME "X3LuminaStudio-${PROJECT_VERSION}-Windows-${CMAKE_SYSTEM_PROCESSOR}")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
-        "Alcedo Studio — RAW photo editor and digital asset manager")
+        "X3LuminaStudio — RAW photo editor and digital asset manager")
     set(CPACK_PACKAGE_DESCRIPTION
-        "Alcedo Studio is a RAW photo editor and digital asset management (DAM) application with GPU-accelerated processing, versioned edits, and a DuckDB-backed library. Development after v0.1.1 is licensed under GPL-3.0-only; see the included license agreement for details.")
+        "X3LuminaStudio is a RAW photo editor and digital asset management (DAM) application with GPU-accelerated processing, versioned edits, and a DuckDB-backed library. Development after v0.1.1 is licensed under GPL-3.0-only; see the included license agreement for details.")
     set(CPACK_PACKAGE_HOMEPAGE_URL "https://alcedo.studio")
     set(CPACK_PACKAGE_CONTACT "https://github.com/zidage/AlcedoStudio")
 
@@ -1915,8 +1916,8 @@ elseif(WIN32 AND TARGET ${ALCEDO_MAIN_BIN})
     endif()
 
     # --- NSIS settings ------------------------------------------------
-    set(CPACK_NSIS_DISPLAY_NAME "Alcedo Studio ${PROJECT_VERSION}")
-    set(CPACK_NSIS_PACKAGE_NAME "Alcedo Studio")
+    set(CPACK_NSIS_DISPLAY_NAME "X3LuminaStudio ${PROJECT_VERSION}")
+    set(CPACK_NSIS_PACKAGE_NAME "X3LuminaStudio")
     set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\alcedo_main.exe")
     set(CPACK_NSIS_HELP_LINK "https://alcedo.studio")
     set(CPACK_NSIS_URL_INFO_ABOUT "https://alcedo.studio")
@@ -1937,7 +1938,7 @@ elseif(WIN32 AND TARGET ${ALCEDO_MAIN_BIN})
         "alcedo_install_path_ready:\n"
     )
     set(CPACK_NSIS_MENU_LINKS
-        "https://alcedo.studio" "Alcedo Studio Website"
+        "https://alcedo.studio" "X3LuminaStudio Website"
         "https://zidage.github.io/AlcedoStudio_docs/" "Documentation"
     )
 
@@ -1945,22 +1946,22 @@ elseif(WIN32 AND TARGET ${ALCEDO_MAIN_BIN})
     # Explorer does not keep a cached OR/bird tile after an in-place upgrade
     # to the same alcedo_main.exe path.
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Alcedo Studio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0"
+        "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0"
     )
     set(CPACK_NSIS_DELETE_ICONS_EXTRA
-        "Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Alcedo Studio.lnk\\\""
+        "Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\X3LuminaStudio.lnk\\\""
     )
     # Desktop shortcut, then ask the shell to refresh cached icons.
     string(CONCAT CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-        "CreateShortCut \\\"$DESKTOP\\\\Alcedo Studio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0\n"
+        "CreateShortCut \\\"$DESKTOP\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0\n"
         "System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'\n"
     )
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
-        "Delete \\\"$DESKTOP\\\\Alcedo Studio.lnk\\\""
+        "Delete \\\"$DESKTOP\\\\X3LuminaStudio.lnk\\\""
     )
 
     # --- WiX settings -------------------------------------------------
-    set(CPACK_WIX_PROGRAM_MENU_FOLDER "Alcedo Studio")
+    set(CPACK_WIX_PROGRAM_MENU_FOLDER "X3LuminaStudio")
     set(CPACK_WIX_CULTURES "zh-CN;en-US")
     set(CPACK_WIX_PROPERTY_ARPURLINFOABOUT "https://alcedo.studio")
     set(CPACK_WIX_PROPERTY_ARPHELPLINK "https://zidage.github.io/AlcedoStudio_docs/")

@@ -57,7 +57,7 @@ namespace {
 
 namespace fs                 = std::filesystem;
 
-constexpr int kLutCategory   = 8;
+constexpr int kLutCategory   = 7;
 const char*   kSpectralId    = "spectral_film_lut";
 const char*   kSpektrafilmId = "spektrafilm_lut";
 const QUrl    kFeedUrl(QStringLiteral("https://static.aoraw.org/luts/v1/manifest.json"));
@@ -578,8 +578,8 @@ TEST(LutSettingsQmlTest, DcpFolderIsATileOfTheLutsAndColorManagementPage) {
 
   EXPECT_EQ(Text(harness.item(QStringLiteral("settingsPageTitle"))),
             QCoreApplication::translate("SettingDialog", "LUTs and Color Management"));
-  EXPECT_EQ(harness.dialog()->property("aiModelsCategory").toInt(), 9);
-  EXPECT_EQ(harness.dialog()->property("aboutCategory").toInt(), 10);
+  EXPECT_EQ(harness.dialog()->property("aiModelsCategory").toInt(), 8);
+  EXPECT_EQ(harness.dialog()->property("aboutCategory").toInt(), 9);
   EXPECT_EQ(harness.item(QStringLiteral("cameraProfileSettingsPanel")), nullptr);
   EXPECT_EQ(harness.item(QStringLiteral("cameraProfileProfilesTile")), nullptr);
   EXPECT_EQ(harness.item(QStringLiteral("cameraProfileCamerasTile")), nullptr);
