@@ -24,11 +24,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>Sponsor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location line="+18"/>
         <source>About</source>
         <translation type="unfinished"></translation>

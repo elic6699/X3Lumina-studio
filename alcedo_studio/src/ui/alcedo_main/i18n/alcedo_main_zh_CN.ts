@@ -24,11 +24,6 @@
         <translation>打开 GitHub</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <source>Sponsor</source>
-        <translation>捐赠支持</translation>
-    </message>
-    <message>
         <location line="+18"/>
         <source>About</source>
         <translation>关于</translation>
@@ -250,14 +245,6 @@
     <message>
         <source>GPL-3.0-only, with an additional permission under GPLv3 section 7 for combining and distributing the required NVIDIA CUDA components.</source>
         <translation>基于 GPL-3.0-only 许可，并依据 GPLv3 第 7 条附加许可，允许组合与分发所需的 NVIDIA CUDA 组件。</translation>
-    </message>
-    <message>
-        <source>GitHub</source>
-        <translation>GitHub</translation>
-    </message>
-    <message>
-        <source>Docs</source>
-        <translation>文档</translation>
     </message>
     <message>
         <source>Build %1</source>

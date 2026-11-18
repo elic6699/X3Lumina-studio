@@ -6,8 +6,8 @@ import QtQuick.Layouts
 
 // Settings > About, laid out as bento tiles like Settings > Local Content Recognition (#824).
 // Hosted as the last StackLayout child of SettingDialog.qml, inside its ScrollView.
-// - Row 1: the Alcedo Studio wordmark of the main window with the copyright and the license,
-//   the Sponsor, GitHub, and Docs buttons, and the Version tile (CountTile) with the build.
+// - Row 1: the X3LuminaStudio wordmark of the main window with the copyright and the license,
+//   and the Version tile (CountTile) with the build.
 // - Row 2: Open Log Folder (the only log control of Settings), the AI model download statement
 //   (read-only), and the third-party licenses, which open as a list in the same tile.
 // - Row 3: the acknowledgements and components of README.md "Acknowledgments", one row per
@@ -24,9 +24,6 @@ ColumnLayout {
     property bool licensesExpanded: false
 
     readonly property string appVersion: appTheme.appVersion
-    readonly property string docsUrl: "https://zidage.github.io/AlcedoStudio_docs/"
-    readonly property string repoUrl: "https://github.com/zidage/AlcedoStudio"
-    readonly property string sponsorUrl: "https://github.com/zidage/AlcedoStudio/discussions/44"
 
     // README.md "Acknowledgments": one entry per subject. `detail` is shown in parentheses after
     // the link name.
@@ -150,37 +147,6 @@ ColumnLayout {
                 Item {
                     Layout.fillHeight: true
                     Layout.minimumHeight: appTheme.spaceLg
-                }
-
-                RowLayout {
-                    Layout.alignment: Qt.AlignRight
-                    spacing: appTheme.spaceSm
-
-                    DialogActionButton {
-                        objectName: "aboutSponsorButton"
-                        buttonWidth: Math.max(96, implicitContentWidth + 32)
-                        buttonHeight: 34
-                        iconSource: "qrc:/panel_icons/heart.svg"
-                        text: qsTr("Sponsor")
-                        onClicked: page.openUrl(page.sponsorUrl)
-                    }
-                    DialogActionButton {
-                        objectName: "aboutGitHubButton"
-                        buttonWidth: Math.max(96, implicitContentWidth + 32)
-                        buttonHeight: 34
-                        iconSource: "qrc:/panel_icons/github.svg"
-                        text: qsTr("GitHub")
-                        onClicked: page.openUrl(page.repoUrl)
-                    }
-                    DialogActionButton {
-                        objectName: "aboutDocsButton"
-                        kind: "light"
-                        buttonWidth: Math.max(96, implicitContentWidth + 32)
-                        buttonHeight: 34
-                        iconSource: "qrc:/panel_icons/book.svg"
-                        text: qsTr("Docs")
-                        onClicked: page.openUrl(page.docsUrl)
-                    }
                 }
             }
         }
