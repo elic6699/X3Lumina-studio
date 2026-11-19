@@ -252,6 +252,9 @@ Release condition, not optional cleanup.
   - a cache size and file-count cap. The cache is currently cleared at every Studio start
     (`PrepareHandoffCacheDirectory`) and drained on editor close and shutdown, so it does not
     grow without bound across sessions; only a single-session cap is not enforced.
+- **Manual acceptance steps:** `docs/handoff_acceptance_checklist.md` lists the executable
+  steps for the three items above, plus the expected failure behaviour. Run it on a machine
+  with a real X3F/X3I, a built `x3lumina`, and a running GUI Studio.
 - **Docs (done):** `x3lumina-external-editor.md` section 3b carries the third destination and
   the temporary-asset lifecycle.
 

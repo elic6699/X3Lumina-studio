@@ -8,7 +8,7 @@
 /// The companion app hands an exported DNG/TIFF to Studio by copying its bytes into the
 /// Studio-managed cache (`Data(contentsOf:)` + `write(.atomic)`), then importing that copy.
 /// No decode, quantisation or gamut mapping happens in the handoff itself. These tests
-/// lock that contract at the byte level, so a future change that decodes and re-encodes
+/// lock that invariant at the byte level, so a future change that decodes and re-encodes
 /// through sRGB/P3, clamps negatives, or clips over-range linear light is caught:
 ///
 ///   * byte-exact cache copy keeps the full RasterColorDescription (primaries, transfer,
