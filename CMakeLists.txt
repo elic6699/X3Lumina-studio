@@ -1946,14 +1946,14 @@ elseif(WIN32 AND TARGET ${ALCEDO_MAIN_BIN})
     # Explorer does not keep a cached OR/bird tile after an in-place upgrade
     # to the same alcedo_main.exe path.
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0"
+        "CreateShortCut \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\x3lumina_violet.ico\\\" 0"
     )
     set(CPACK_NSIS_DELETE_ICONS_EXTRA
         "Delete \\\"$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\X3LuminaStudio.lnk\\\""
     )
     # Desktop shortcut, then ask the shell to refresh cached icons.
     string(CONCAT CPACK_NSIS_EXTRA_INSTALL_COMMANDS
-        "CreateShortCut \\\"$DESKTOP\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_studio_ao.ico\\\" 0\n"
+        "CreateShortCut \\\"$DESKTOP\\\\X3LuminaStudio.lnk\\\" \\\"$INSTDIR\\\\bin\\\\alcedo_main.exe\\\" \\\"\\\" \\\"$INSTDIR\\\\bin\\\\x3lumina_violet.ico\\\" 0\n"
         "System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'\n"
     )
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS

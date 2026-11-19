@@ -57,7 +57,7 @@ foreach ($developmentDir in @('include', 'lib', 'share')) {
 $requiredFiles = @(
     'alcedo_main.exe',
     'alcedo-cli.exe',
-    'alcedo_studio_ao.ico',
+    'x3lumina_violet.ico',
     'alcedo_mind.exe',
     'DirectML.dll',
     'aria2c.exe',

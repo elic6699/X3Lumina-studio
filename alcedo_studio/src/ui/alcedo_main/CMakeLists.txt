@@ -656,9 +656,10 @@ if(APPLE)
     set(ALCEDO_MAIN_ICONSET_DIR "${ALCEDO_BINARY_ROOT}/alcedo_icon.iconset")
     # Keep the bundled resource name distinct from every previously shipped
     # mark. Launch Services caches application icons by bundle metadata and
-    # resource identity; reusing alcedo_icon.icns kept the old bird, and
-    # reusing alcedo_studio_or.icns kept the OR mark after the AO refresh.
-    set(ALCEDO_MAIN_ICON_ICNS "${ALCEDO_BINARY_ROOT}/alcedo_studio_ao.icns")
+    # resource identity; reusing alcedo_icon.icns kept the old bird, reusing
+    # alcedo_studio_or.icns kept the OR mark, and reusing alcedo_studio_ao.icns
+    # kept the prior mark after the violet refresh.
+    set(ALCEDO_MAIN_ICON_ICNS "${ALCEDO_BINARY_ROOT}/x3lumina_violet.icns")
 
     if(EXISTS "${ALCEDO_MAIN_ICON_ICNS_SRC}")
         add_custom_command(
@@ -711,7 +712,7 @@ if(APPLE)
     target_sources(alcedo_main PRIVATE "${ALCEDO_MAIN_ICON_ICNS}")
     # CFBundleIconFile — Finder, Dock, and Launchpad use this for the .app.
     set_target_properties(alcedo_main PROPERTIES
-        MACOSX_BUNDLE_ICON_FILE "alcedo_studio_ao.icns"
+        MACOSX_BUNDLE_ICON_FILE "x3lumina_violet.icns"
     )
 endif()
 
@@ -747,7 +748,7 @@ if(WIN32)
         # pick up a newly named mark after an in-place upgrade.
         install(FILES "${ALCEDO_MAIN_ICON_ICO}"
             DESTINATION "${CMAKE_INSTALL_BINDIR}"
-            RENAME "alcedo_studio_ao.ico"
+            RENAME "x3lumina_violet.ico"
         )
         add_custom_command(TARGET alcedo_main POST_BUILD
             COMMAND powershell -NoProfile -ExecutionPolicy Bypass
@@ -1379,6 +1380,7 @@ if(APPLE AND ALCEDO_MACOS_BUNDLE AND
         COMMAND ${CMAKE_COMMAND} -E rm -f
             "$<TARGET_BUNDLE_CONTENT_DIR:alcedo_main>/Resources/alcedo_icon.icns"
             "$<TARGET_BUNDLE_CONTENT_DIR:alcedo_main>/Resources/alcedo_studio_or.icns"
+            "$<TARGET_BUNDLE_CONTENT_DIR:alcedo_main>/Resources/alcedo_studio_ao.icns"
         COMMAND ${CMAKE_COMMAND} -E touch "$<TARGET_BUNDLE_DIR:alcedo_main>"
         COMMAND "${ALCEDO_CODESIGN_EXECUTABLE}"
             --force
