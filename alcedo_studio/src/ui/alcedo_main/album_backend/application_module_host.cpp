@@ -8,6 +8,7 @@
 #include <QDeadlineTimer>
 #include <QDebug>
 #include <QEventLoop>
+#include <QFile>
 #include <QFileInfo>
 #include <QMetaObject>
 #include <QPointer>
@@ -26,6 +27,9 @@
 #include <string>
 #include <system_error>
 #include <vector>
+
+#include "automation/handoff_cache.hpp"
+#include "utils/import/import_log.hpp"
 
 #include "app/editor_adjustment_context.hpp"
 #include "app/editor_pending_input.hpp"
@@ -615,6 +619,13 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
                                     semantic_generation_.get());
   nikon_he_recovery_->BindCollaborators(import_export_.get(), semantic_generation_.get());
 
+  // Temporary export handoff: record assets imported from the cache directory, and discard
+  // the open one once the editor releases it. Both handlers are no-ops for normal photos.
+  connect(import_export_.get(), &ImportExportHandler::ImportLogReady, this,
+          &ApplicationModuleHost::OnImportLogReady);
+  connect(editor_session_.get(), &EditorSessionController::StateChanged, this,
+          &ApplicationModuleHost::OnEditorIdleAfterClose);
+
   ProjectLifecycleHooks lifecycle_hooks;
   lifecycle_hooks.project_switch_block_reason = [import_export = import_export_.get()] {
     // ImportRunning() stays true while the finished import is written to the project.
@@ -738,11 +749,123 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
   project_->SetLifecycleHooks(std::move(lifecycle_hooks));
 }
 
+void ApplicationModuleHost::OnImportLogReady(
+    const std::shared_ptr<const ImportLogSnapshot>& snapshot) {
+  if (!snapshot) {
+    return;
+  }
+  const QString cache_dir = automation::HandoffCacheDirectory();
+  if (cache_dir.isEmpty()) {
+    return;
+  }
+  const std::filesystem::path cache_root = std::filesystem::path(cache_dir.toStdWString());
+  for (const ImportLogEntry& entry : snapshot->created_) {
+    if (!entry.metadata_ok_ || entry.element_id_ == 0 || entry.image_id_ == 0) {
+      continue;
+    }
+    // Only assets whose source file lives inside the handoff cache are temporary. A normal
+    // import of an unrelated file is never tracked.
+    const std::filesystem::path source = entry.source_path_.lexically_normal();
+    const std::filesystem::path root   = cache_root.lexically_normal();
+    auto source_it = source.begin();
+    auto root_it   = root.begin();
+    bool inside    = true;
+    for (; root_it != root.end(); ++root_it, ++source_it) {
+      if (source_it == source.end() || *source_it != *root_it) {
+        inside = false;
+        break;
+      }
+    }
+    if (!inside) {
+      continue;
+    }
+    temporary_assets_.Track(TemporaryAsset{entry.element_id_, entry.image_id_, source});
+  }
+}
+
+void ApplicationModuleHost::OnEditorIdleAfterClose() {
+  if (!editor_session_) {
+    return;
+  }
+  const auto state = editor_session_->session_state();
+  const auto image = editor_session_->image_id();
+
+  // Remember a handoff image while it is open so that after close, when the session has
+  // already cleared its id, we still know which asset to discard.
+  if (state == alcedo::EditorSessionState::Interactive && image != 0 &&
+      temporary_assets_.Contains(image)) {
+    last_handoff_image_id_ = image;
+    return;
+  }
+
+  const bool released = (state == alcedo::EditorSessionState::NoImage ||
+                         state == alcedo::EditorSessionState::ShuttingDown) &&
+                        image == 0 && !editor_session_->close_in_flight() &&
+                        !editor_session_->persist_in_flight();
+  if (!released || last_handoff_image_id_ == 0) {
+    return;
+  }
+
+  const auto asset = temporary_assets_.TakeForImage(last_handoff_image_id_);
+  last_handoff_image_id_ = 0;
+  if (!asset.has_value() || !library_mutations_) {
+    return;
+  }
+
+  const QString file_name = QString::fromStdWString(asset->cache_path_.filename().wstring());
+  QVariantList  targets{QVariantMap{{QStringLiteral("elementId"),
+                                    static_cast<uint>(asset->element_id_)},
+                                    {QStringLiteral("imageId"), static_cast<uint>(asset->image_id_)},
+                                    {QStringLiteral("fileName"), file_name}}};
+  // The handoff asset was imported into whatever folder was current at export time; the user
+  // may have navigated elsewhere since. Force a library-level delete so the row, pipeline, and
+  // pool entry are removed even when a subfolder is selected.
+  const QVariantMap started = library_mutations_->StartDeleteTargetsFromLibrary(targets);
+  if (!started.value(QStringLiteral("started")).toBool()) {
+    // The asset stays tracked only if it can be retried on a later close.
+    temporary_assets_.Track(*asset);
+    last_handoff_image_id_ = asset->image_id_;
+    return;
+  }
+
+  // The database delete runs on a worker and never removes the source file. Remove the cache
+  // file after the delete finishes so a pipeline still reading it cannot be disturbed. Check
+  // the result so an unrelated delete finishing first cannot remove a cache file in use.
+  const std::filesystem::path cache_path = asset->cache_path_;
+  const uint element_id                  = asset->element_id_;
+  auto* mutations                        = library_mutations_.get();
+  auto  connection = std::make_shared<QMetaObject::Connection>();
+  *connection = QObject::connect(
+      mutations, &LibraryMutationOperations::DeleteTargetsFinished, this,
+      [connection, mutations, cache_path, element_id](const QVariantMap& result) {
+        const QList<QVariant> deleted = result.value(QStringLiteral("deletedElementIds")).toList();
+        bool deleted_this = false;
+        for (const QVariant& id : deleted) {
+          if (id.toUInt() == element_id) {
+            deleted_this = true;
+            break;
+          }
+        }
+        if (!deleted_this) {
+          return;
+        }
+        QObject::disconnect(*connection);
+        QFile::remove(QString::fromStdWString(cache_path.wstring()));
+      });
+}
+
 void ApplicationModuleHost::ShutdownModules() {
   if (shutting_down_) {
     return;
   }
   shutting_down_ = true;
+
+  // Any handoff asset still tracked at shutdown did not get a normal editor close. The cache
+  // files are pure temporary data, so remove them. Database records are left to project save.
+  for (const auto& asset : temporary_assets_.TakeAll()) {
+    QFile::remove(QString::fromStdWString(asset.cache_path_.wstring()));
+  }
+  last_handoff_image_id_ = 0;
 
   try {
     // Wake blocked save-lock waiters before tearing down editor session work so

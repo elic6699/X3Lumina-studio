@@ -601,6 +601,16 @@ auto ImageController::DeleteResultMap(const DeleteExecutionResult& result) -> QV
 }
 
 auto ImageController::StartDeleteImages(const QVariantList& targetEntries) -> QVariantMap {
+  return StartDeleteImagesImpl(targetEntries, false);
+}
+
+auto ImageController::StartDeleteImagesFromLibrary(const QVariantList& targetEntries)
+    -> QVariantMap {
+  return StartDeleteImagesImpl(targetEntries, true);
+}
+
+auto ImageController::StartDeleteImagesImpl(const QVariantList& targetEntries, const bool fromLibrary)
+    -> QVariantMap {
   QVariantMap result{{QStringLiteral("started"), false}, {QStringLiteral("message"), QString{}}};
   if (policy_) {
     const QVariantMap policy = policy_->EvaluateDeleteImages(targetEntries);
@@ -618,7 +628,7 @@ auto ImageController::StartDeleteImages(const QVariantList& targetEntries) -> QV
     }
   }
   QString refusal;
-  auto    batch = PrepareDeleteBatch(CollectDeleteTargets(targetEntries), &refusal);
+  auto    batch = PrepareDeleteBatch(CollectDeleteTargets(targetEntries), &refusal, fromLibrary);
   if (!batch.has_value()) {
     result[QStringLiteral("message")] = refusal;
     return result;
@@ -810,8 +820,8 @@ auto ImageController::AddImagesToFolder(const QVariantList& targetEntries, uint 
   return result;
 }
 
-auto ImageController::PrepareDeleteBatch(const std::vector<DeleteTarget>& targets, QString* refusal)
-    -> std::optional<DeleteBatch> {
+auto ImageController::PrepareDeleteBatch(const std::vector<DeleteTarget>& targets, QString* refusal,
+                                         const bool fromLibrary) -> std::optional<DeleteBatch> {
   const auto refuse = [this,
                        refusal](const i18n::LocalizedText& msg) -> std::optional<DeleteBatch> {
     status_->SetTaskState(msg, 0, false);
@@ -851,8 +861,12 @@ auto ImageController::PrepareDeleteBatch(const std::vector<DeleteTarget>& target
   }
 
   DeleteBatch batch;
-  batch.folder_id_           = folder_id.value();
-  batch.delete_from_library_ = folder_id.value() == 0;
+  // A forced library delete must target folder 0 so the delete job calls
+  // DeleteFilesEverywhere; a non-zero folder only removes the album link even when
+  // delete_from_library_ is set. Folder 0 also makes cleanup independent of whichever
+  // folder the user navigated to while the editor was open.
+  batch.folder_id_           = fromLibrary ? 0 : folder_id.value();
+  batch.delete_from_library_ = fromLibrary || folder_id.value() == 0;
   batch.targets_             = targets;
   for (auto& target : batch.targets_) {
     if (target.image_id_ == 0 || target.file_path_.empty()) {

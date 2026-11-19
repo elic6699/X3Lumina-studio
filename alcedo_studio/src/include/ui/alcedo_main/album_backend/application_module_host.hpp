@@ -20,6 +20,7 @@ class QQmlEngine;
 #include "app/download_service.hpp"
 #include "app/editor_session_bootstrap.hpp"
 #include "app/lut_library_service.hpp"
+#include "app/temporary_asset_registry.hpp"
 #include "app/lut_package_service.hpp"
 #include "app/model_download_service.hpp"
 #include "app/update_service.hpp"
@@ -241,6 +242,10 @@ class ApplicationModuleHost final : public QObject {
  private:
   void RecordConstruction(const char* type_name, const void* object);
   void RecordDestruction(const char* type_name, const void* object);
+  /// Records imported assets whose source path is inside the handoff cache directory.
+  void OnImportLogReady(const std::shared_ptr<const ImportLogSnapshot>& snapshot);
+  /// Deletes the temporary asset that the editor just released, then removes its cache file.
+  void OnEditorIdleAfterClose();
   void ShutdownModules();
   /// Removes the runtime workspace that ShutdownModules recorded in
   /// pending_workspace_removal_. Called by the destructor after ProjectModule (the last owner
@@ -292,6 +297,10 @@ class ApplicationModuleHost final : public QObject {
   std::unique_ptr<ProjectLaunchCoordinator>            project_launch_;
   std::unique_ptr<ApplicationCloseCoordinator>         application_close_;
   std::unique_ptr<LibraryMutationOperations>           library_mutations_;
+  /// Temporary assets imported from the handoff cache, discarded when the editor closes.
+  alcedo::TemporaryAssetRegistry                       temporary_assets_;
+  /// Image id of the handoff asset currently open in the editor, zero when none.
+  image_id_t                                           last_handoff_image_id_ = 0;
 
   LifecycleObserver                                    lifecycle_observer_{};
   bool                                                 shutting_down_ = false;

@@ -45,7 +45,7 @@ alcedo_add_automation_test(AutomationServerTest
     LIBRARIES AutomationHostLib Qt6::Network)
 
 alcedo_add_automation_test(AutomationSessionFileTest
-    SOURCES automation_session_file_test.cpp
+    SOURCES automation_session_file_test.cpp handoff_cache_test.cpp
     LIBRARIES AutomationProtocol)
 
 # A small session host that `alcedo-cli session start --host-binary` starts in place of

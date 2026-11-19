@@ -64,6 +64,20 @@ auto DeleteAndWait(ApplicationModuleHost& backend, const QVariantList& targets) 
   return finished.takeFirst().at(0).toMap();
 }
 
+/// Starts a forced library delete (temporary-asset path) and waits for it to finish.
+auto DeleteFromLibraryAndWait(ApplicationModuleHost& backend, const QVariantList& targets)
+    -> QVariantMap {
+  QSignalSpy        finished(backend.images(), &ImageController::DeleteImagesFinished);
+  const QVariantMap started = backend.images()->StartDeleteImagesFromLibrary(targets);
+  if (!started.value("started").toBool()) {
+    return QVariantMap{{"success", false}, {"message", started.value("message")}};
+  }
+  if (!WaitUntil([&]() { return finished.count() > 0; })) {
+    return QVariantMap{{"success", false}, {"message", QStringLiteral("delete timed out")}};
+  }
+  return finished.takeFirst().at(0).toMap();
+}
+
 auto FindTaskOfKind(ApplicationModuleHost& backend, const QString& kind) -> QVariantMap {
   auto* registry = qobject_cast<BackgroundTaskController*>(backend.background_tasks());
   if (registry == nullptr) {
@@ -274,6 +288,46 @@ TEST_F(DeleteTests, AddToAlbumThenDeleteFromAlbum_KeepsRootFile) {
   EXPECT_EQ(root_after_unlink.value("elementId").toUInt(), file_id);
 
   (void)image_id;
+}
+
+/// A temporary handoff asset is removed from the library even when the current folder is a
+/// subfolder. The ordinary delete in that folder would only unlink the album row and leave the
+/// library row behind; the forced path used by the handoff cleanup must not.
+TEST_F(DeleteTests, DeleteFromLibraryInSubfolderRemovesTheLibraryRow) {
+  const auto populated = CreatePopulatedPackedProject(temp_dir_, {}, 1);
+  ASSERT_TRUE(populated.has_value());
+
+  ApplicationModuleHost backend;
+  ASSERT_TRUE(LoadPackedProject(backend, populated->packed_path_));
+  ASSERT_FALSE(backend.library()->Thumbnails().isEmpty());
+
+  const QVariantMap root_item = backend.library()->Thumbnails().front().toMap();
+  const auto        file_id   = static_cast<sl_element_id_t>(root_item.value("elementId").toUInt());
+  const auto        image_id  = static_cast<image_id_t>(root_item.value("imageId").toUInt());
+
+  backend.folders()->CreateFolder("HandoffAlbum");
+  ProcessEvents(500);
+  const uint album_ui_id = FindFolderId(backend.folders()->Folders(), "HandoffAlbum");
+  ASSERT_NE(album_ui_id, 0u);
+
+  QVariantList targets{TargetOf(file_id, image_id)};
+  ASSERT_TRUE(backend.images()->AddImagesToFolder(targets, album_ui_id).value("success").toBool());
+  backend.folders()->SelectFolder(album_ui_id);
+  ProcessEvents(500);
+  ASSERT_EQ(backend.library()->ShownCount(), 1);
+
+  // Force a library-level delete while the subfolder is selected.
+  const QVariantMap result = DeleteFromLibraryAndWait(backend, targets);
+  ProcessEvents(500);
+  EXPECT_TRUE(result.value("success").toBool()) << result.value("message").toString().toStdString();
+  EXPECT_EQ(result.value("deletedCount").toInt(), 1);
+  EXPECT_EQ(backend.library()->ShownCount(), 0);
+
+  // The album link is gone and the library row is gone too: switching to the root must not
+  // bring the photo back.
+  backend.folders()->SelectFolder(0);
+  ProcessEvents(500);
+  EXPECT_EQ(backend.library()->ShownCount(), 0);
 }
 
 /// The editor list check of @p fileId (LibraryModule::RequestEditorListPosition): the

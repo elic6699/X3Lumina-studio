@@ -245,6 +245,13 @@ def_library(ImagePoolService
     PUBLIC_DEPS ImagePool Image Storage
 )
 
+# In-memory record of temporary export handoff assets. No decoder, database, or Qt dependency.
+def_library(TemporaryAssetRegistry
+    SOURCES
+        "${ALCEDO_APP_ROOT}/temporary_asset_registry.cpp"
+        "${ALCEDO_INCLUDE_ROOT}/app/temporary_asset_registry.hpp"
+)
+
 set(ALCEDO_SEMANTIC_PROTO_DIR "${CMAKE_SOURCE_DIR}/rust/puerh_mind/proto")
 set(ALCEDO_SEMANTIC_PROTO "${ALCEDO_SEMANTIC_PROTO_DIR}/semantic.proto")
 set(ALCEDO_SEMANTIC_PROTO_GEN_DIR "${ALCEDO_BINARY_ROOT}/generated/semantic")

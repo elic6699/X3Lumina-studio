@@ -394,6 +394,9 @@ target_link_libraries(AlbumBackendLib
         AiSidecarRuntimeService
         EditorComparisonInputs
         EditorSessionService
+        # Temporary export handoff: registry of cache-sourced assets and the cache path helper.
+        TemporaryAssetRegistry
+        AutomationProtocol
         EditorMaskCreationController
         EditorAdjustmentPipeline
         EditorParameterCatalog

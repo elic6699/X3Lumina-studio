@@ -134,14 +134,18 @@ untouched (the TIFF/DNG is still produced by x3lumina's own wide-gamut pipeline)
 
 - **JPEG (embedded extract) and JPEG (RAW re-encode)**: on export completion, x3lumina
   terminates itself. No dialog — the user is handing a finished JPEG back to the DAM.
-- **16-bit TIFF and DNG**: pressing "start export" first shows a two-way choice:
+- **16-bit TIFF and DNG**: pressing "start export" first shows a three-way choice:
   1. **直接导出 (Direct export)** — write the file with x3lumina's pipeline, then terminate.
-  2. **回传 Alcedo 继续编辑 (Hand back to Alcedo)** — write the file, then import it into the
-     running Alcedo Studio library and open it in Alcedo's built-in editor, where the user
-     continues editing and exports. x3lumina terminates once the handoff succeeds.
+  2. **回传 Alcedo 继续编辑 (Hand back to Alcedo)** — write the file to the export directory
+     the user chose, import it into the running Alcedo Studio library, and open it in
+     Alcedo's built-in editor. The file stays on disk as a normal library photo.
+  3. **回传并自动清理 (Hand back and discard)** — write the file into the Studio-managed
+     handoff cache instead, import it as a temporary asset, and open it in Alcedo's editor.
+     The library asset and the cache file are removed when the editor closes. This is the
+     "the intermediate file is only a cache, discarded after use" path.
 
-The handoff (option 2) is implemented in `AlcedoHandoff.swift` as a sequence of `alcedo-cli`
-automation calls over the GUI host's JSON-RPC socket:
+Both handoff options use the same `alcedo-cli` call sequence, implemented in
+`AlcedoHandoff.swift` over the GUI host's JSON-RPC socket:
 
 ```sh
 alcedo-cli --json --session gui call library.import  '{"paths":["<exported.tif>"]}'   # -> task_id
@@ -149,6 +153,34 @@ alcedo-cli --json --session gui call tasks.wait      '{"task_id":"<id>"}'       
 alcedo-cli --json --session gui call search.query    '{"text":"<stem>","mode":"fuzzy"}' # -> element_id
 alcedo-cli --json --session gui call editor.open     '{"element_id":<id>}'              # open in editor
 ```
+
+The only difference between options 2 and 3 is where `<exported.tif>` is written. Option 2 uses
+the directory picked in the export dialog. Option 3 uses the `cache_directory` field of the
+live GUI session file: Studio creates `AppLocalDataLocation/handoff-cache`, clears stale files
+there at startup, and publishes its absolute path in every session file. The companion app
+must read that field and must not hardcode the path.
+
+### Temporary-asset lifecycle (option 3)
+
+Studio treats an import as temporary when the imported file's source path is inside the
+handoff cache directory. No user setting marks it as temporary.
+
+1. The import follows the ordinary `ImportService::ImportToFolder` path: file metadata, the
+   library row, a pinned image, and an edit-history root are created as for any import. The
+   encoded bytes pass through the cache verbatim - no re-encode, quantisation, or gamut
+   mapping happens in the handoff.
+2. `ApplicationModuleHost` records `(element_id, image_id, cache_path)` in an in-memory
+   `TemporaryAssetRegistry`. Nothing about the asset is persisted as temporary.
+3. `editor.open` lands in Studio's own editor because TIFF/DNG are not `.x3f`/`.x3i` and do
+   not re-trigger the external bridge. Every Develop, colour, and export feature available
+   to TIFF/DNG works unchanged.
+4. On editor close (`NoImage`, no persist or close in flight), Studio starts a delete for the
+   tracked element. That removes the database row, pipeline, image-pool entry, and export
+   tasks via the existing delete path. The cache file is removed only after
+   `DeleteTargetsFinished` reports that element id, so an unrelated delete cannot remove a
+   file still in use.
+5. At shutdown, any remaining tracked cache file is removed. A crashed run leaves at most
+   files in the cache directory; the next Studio start clears them.
 
 Notes:
 
@@ -164,6 +196,14 @@ Notes:
 - The handoff is best-effort. If any CLI call fails, x3lumina stays open, shows the error with
   the output path, and the user can import the file manually. Nothing is written back to the
   source X3F/X3I.
+- **No folder caveat (option 3).** `library.import` has no destination parameter and imports
+  into whichever folder is selected. Studio's cleanup uses a dedicated library-level delete
+  (`StartDeleteTargetsFromLibrary`) that removes the row, pipeline, and image-pool entry even
+  from a subfolder, so the asset is fully discarded wherever it was imported. The companion
+  app does not need to select the root folder first.
+- **Wide-gamut is inherited.** The cache holds the exported bytes unchanged. The existing
+  import path resolves the file's own ICC (16-bit TIFF) or DNG colour metadata; no step
+  clamps to sRGB/P3 or cuts negative or out-of-range linear values.
 
 Relevant companion-app files: `ExternalLaunch.swift` (post-export dispatch, foreground/maximize),
 `AlcedoHandoff.swift` (CLI chain), `Engine.swift` (`onExportFinished` + exported URL list),

@@ -60,6 +60,10 @@ class LibraryMutationOperations final : public QObject {
    * ElementsDeleted (when an element was deleted) and then DeleteTargetsFinished.
    */
   Q_INVOKABLE QVariantMap  StartDeleteTargets(const QVariantList& targets);
+  /// Like StartDeleteTargets, but removes the targets from the library regardless of the
+  /// selected folder (ImageController::StartDeleteImagesFromLibrary). For temporary assets that
+  /// must be fully discarded; not a user-facing delete. The same signals follow.
+  Q_INVOKABLE QVariantMap  StartDeleteTargetsFromLibrary(const QVariantList& targets);
   /// Sets the star rating of @p targets. One target uses ImageController::SetImageRating and
   /// returns its result (success, rating, message). Several targets use the batch path
   /// ImageController::StartSetImageRatings and return its result (started, taskId, message)

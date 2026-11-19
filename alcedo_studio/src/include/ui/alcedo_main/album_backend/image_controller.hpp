@@ -80,6 +80,15 @@ class ImageController final : public QObject {
    * project or of a target; it can start once that task is complete.
    */
   Q_INVOKABLE QVariantMap StartDeleteImages(const QVariantList& targetEntries);
+
+  /**
+   * @brief Starts a delete that removes library rows even when a subfolder is selected.
+   *
+   * Same steps and result as StartDeleteImages, but always removes the database rows,
+   * pipelines, and image-pool entries instead of only the album links. For temporary assets
+   * that must be fully discarded; this is not a user action.
+   */
+  Q_INVOKABLE QVariantMap StartDeleteImagesFromLibrary(const QVariantList& targetEntries);
   /// True while a delete started by StartDeleteImages runs.
   [[nodiscard]] auto      delete_running() const -> bool { return delete_running_; }
   /// User action: refused with the reason in `message` while an automation agent holds control.
@@ -255,10 +264,14 @@ class ImageController final : public QObject {
 
   [[nodiscard]] auto CollectDeleteTargets(const QVariantList& targetEntries) const
       -> std::vector<DeleteTarget>;
+  // Shared entry for the user delete and the forced library delete. @p fromLibrary overrides
+  // the folder scope so every target is removed from the library, not just from an album.
+  auto StartDeleteImagesImpl(const QVariantList& targetEntries, bool fromLibrary) -> QVariantMap;
   // Checks the project state and resolves @p targets on the UI thread. Without a batch,
-  // @p refusal holds the message.
-  [[nodiscard]] auto PrepareDeleteBatch(const std::vector<DeleteTarget>& targets, QString* refusal)
-      -> std::optional<DeleteBatch>;
+  // @p refusal holds the message. @p fromLibrary forces library-level removal regardless of
+  // the selected folder.
+  [[nodiscard]] auto PrepareDeleteBatch(const std::vector<DeleteTarget>& targets, QString* refusal,
+                                        bool fromLibrary = false) -> std::optional<DeleteBatch>;
   // The job that writes @p batch: database delete, cleanup, save and package. It takes the
   // services of the open project now and may run on any thread.
   [[nodiscard]] auto MakeDeleteJob(DeleteBatch batch) const -> std::function<DeleteBatchOutcome()>;

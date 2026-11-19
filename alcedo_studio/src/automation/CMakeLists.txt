@@ -9,6 +9,8 @@ def_library(AutomationProtocol
         "${ALCEDO_INCLUDE_ROOT}/automation/automation_protocol.hpp"
         "${ALCEDO_AUTOMATION_ROOT}/automation_session_file.cpp"
         "${ALCEDO_INCLUDE_ROOT}/automation/automation_session_file.hpp"
+        "${ALCEDO_AUTOMATION_ROOT}/handoff_cache.cpp"
+        "${ALCEDO_INCLUDE_ROOT}/automation/handoff_cache.hpp"
         "${ALCEDO_AUTOMATION_ROOT}/automation_client.cpp"
         "${ALCEDO_INCLUDE_ROOT}/automation/automation_client.hpp"
     PUBLIC_DEPS

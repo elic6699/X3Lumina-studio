@@ -12,6 +12,7 @@
 
 #include "automation/automation_protocol.hpp"
 #include "automation/automation_session_file.hpp"
+#include "automation/handoff_cache.hpp"
 #include "ui/alcedo_main/automation/automation_adjustment_commands.hpp"
 #include "ui/alcedo_main/automation/automation_control_commands.hpp"
 #include "ui/alcedo_main/automation/automation_curve_commands.hpp"
@@ -92,6 +93,15 @@ auto AutomationHostSession::Start(QString* error) -> bool {
   }
   if (!RegisterCommands(error)) {
     return false;
+  }
+  // The companion app writes temporary export files here in GUI mode. Clear files left by a
+  // previous run so a crashed handoff cannot be imported as a live asset. A failure is not
+  // fatal to the session: the cache field is simply left empty and the handoff is disabled.
+  if (IsGuiHost()) {
+    QString cache_error;
+    if (!PrepareHandoffCacheDirectory(&cache_error)) {
+      qWarning().noquote() << "[HandoffCache]" << cache_error;
+    }
   }
 
   connect(&tracker_, &AutomationTaskTracker::TaskUpdated, this, [this](const QJsonObject& task) {
@@ -189,6 +199,9 @@ auto AutomationHostSession::WriteSessionFile(QString* error) -> bool {
   session_file.host_mode        = options_.host_mode;
   session_file.project_path =
       QString::fromStdWString(host_->project()->handler().package_path().generic_wstring());
+  if (IsGuiHost()) {
+    session_file.cache_directory = HandoffCacheDirectory();
+  }
   session_file.started_at = started_at_;
   return WriteAutomationSessionFile(options_.session_dir, session_file, error);
 }

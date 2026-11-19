@@ -820,6 +820,7 @@ void ImportExportHandler::CompleteImport(const ImportResult&                    
                                          const std::shared_ptr<const ImportLogSnapshot>& snapshot,
                                          const ImportFinalizeOutcome&                    outcome) {
   JoinFinalizeThread();
+  emit ImportLogReady(snapshot);
   const bool reimporting_nikon_he        = nikon_ && nikon_->is_reimporting();
   const auto recovery_target_folder_id   = import_target_folder_id_;
   const auto recovery_target_folder_path = import_target_folder_path_;

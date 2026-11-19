@@ -1587,6 +1587,124 @@ if(APPLE AND ALCEDO_MACOS_BUNDLE AND TARGET ${ALCEDO_MAIN_BIN})
             endif()
         endforeach()
 
+        # Iterative dependency resolution for the bundle. macdeployqt fixes only
+        # first-level dependencies; second-level links (OpenCV inter-library,
+        # libjxl_cms, ...) arrive with unresolved paths, and new Homebrew versions
+        # rename the versioned dylibs, so resolve generically instead of
+        # hard-coding filenames. Each round: rewrite absolute dependencies to
+        # @rpath inside Contents/Frameworks, copy any dependency that is still
+        # missing from the bundle, and make every library id bundle-relative.
+        # Repeat until no new library is copied (bounded rounds). The
+        # ALCEDO_MACOS_VERIFY_BUNDLE_DEPS check below still reports anything that
+        # cannot be resolved, so failures stay loud.
+        set(_alcedo_resolve_round 0)
+        set(_alcedo_copied_any TRUE)
+        while(_alcedo_copied_any AND _alcedo_resolve_round LESS 8)
+            math(EXPR _alcedo_resolve_round \"\${_alcedo_resolve_round} + 1\")
+            set(_alcedo_copied_any FALSE)
+            file(GLOB _alcedo_fw_dylibs \"\${_alcedo_fw_dir}/*.dylib\")
+            foreach(_alcedo_dylib IN LISTS _alcedo_fw_dylibs)
+                execute_process(
+                    COMMAND /usr/bin/otool -L \"\${_alcedo_dylib}\"
+                    RESULT_VARIABLE _alcedo_deps_otool_result
+                    OUTPUT_VARIABLE _alcedo_deps_otool_output
+                    ERROR_QUIET
+                )
+                if(NOT _alcedo_deps_otool_result EQUAL 0)
+                    continue()
+                endif()
+                get_filename_component(_alcedo_dylib_name \"\${_alcedo_dylib}\" NAME)
+                execute_process(COMMAND /bin/chmod u+w \"\${_alcedo_dylib}\" ERROR_QUIET)
+                string(REPLACE \"\\n\" \";\" _alcedo_dep_lines \"\${_alcedo_deps_otool_output}\")
+                foreach(_alcedo_dep_line IN LISTS _alcedo_dep_lines)
+                    string(STRIP \"\${_alcedo_dep_line}\" _alcedo_dep_line)
+                    if(\"\${_alcedo_dep_line}\" STREQUAL \"\" OR \"\${_alcedo_dep_line}\" MATCHES \":$\")
+                        continue()
+                    endif()
+                    string(REGEX MATCH \"^[^ \\t]+\" _alcedo_dep \"\${_alcedo_dep_line}\")
+                    if(\"\${_alcedo_dep}\" MATCHES \"^/\")
+                        if(\"\${_alcedo_dep}\" MATCHES \"^/System/Library/\" OR
+                           \"\${_alcedo_dep}\" MATCHES \"^/usr/lib/\")
+                            # System library (dyld shared cache): allowed to stay
+                            # absolute, same roots the dependency check accepts.
+                            continue()
+                        endif()
+                        # Absolute dependency: copy the target into the bundle if it
+                        # is missing, then point the load command at the copy.
+                        get_filename_component(_alcedo_dep_name \"\${_alcedo_dep}\" NAME)
+                        if(NOT EXISTS \"\${_alcedo_fw_dir}/\${_alcedo_dep_name}\")
+                            execute_process(
+                                COMMAND /bin/cp -fL \"\${_alcedo_dep}\"
+                                        \"\${_alcedo_fw_dir}/\${_alcedo_dep_name}\"
+                                RESULT_VARIABLE _alcedo_copy_result
+                            )
+                            if(NOT _alcedo_copy_result EQUAL 0)
+                                message(FATAL_ERROR
+                                    \"Failed to bundle dependency \${_alcedo_dep}\")
+                            endif()
+                            set(_alcedo_copied_any TRUE)
+                        endif()
+                        execute_process(
+                            COMMAND /usr/bin/install_name_tool
+                                    -change \"\${_alcedo_dep}\"
+                                            \"@rpath/\${_alcedo_dep_name}\"
+                                    \"\${_alcedo_dylib}\"
+                            RESULT_VARIABLE _alcedo_change_result
+                        )
+                        if(NOT _alcedo_change_result EQUAL 0)
+                            message(FATAL_ERROR
+                                \"Failed to rewrite \${_alcedo_dep} in \${_alcedo_dylib}\")
+                        endif()
+                    elseif(\"\${_alcedo_dep}\" MATCHES \"^@rpath/\")
+                        string(REGEX REPLACE \"^@rpath/\" \"\" _alcedo_dep_name
+                                             \"\${_alcedo_dep}\")
+                        if(NOT EXISTS \"\${_alcedo_fw_dir}/\${_alcedo_dep_name}\")
+                            _alcedo_find_lib(_alcedo_dep_src \"\${_alcedo_dep_name}\")
+                            if(NOT \"\${_alcedo_dep_src}\" STREQUAL \"\")
+                                execute_process(
+                                    COMMAND /bin/cp -fL \"\${_alcedo_dep_src}\"
+                                            \"\${_alcedo_fw_dir}/\${_alcedo_dep_name}\"
+                                    RESULT_VARIABLE _alcedo_copy_result
+                                )
+                                if(NOT _alcedo_copy_result EQUAL 0)
+                                    message(FATAL_ERROR
+                                        \"Failed to bundle dependency \${_alcedo_dep}\")
+                                endif()
+                                set(_alcedo_copied_any TRUE)
+                            endif()
+                        endif()
+                    endif()
+                endforeach()
+                execute_process(
+                    COMMAND /usr/bin/otool -D \"\${_alcedo_dylib}\"
+                    RESULT_VARIABLE _alcedo_id_otool_result
+                    OUTPUT_VARIABLE _alcedo_id_otool_output
+                    ERROR_QUIET
+                )
+                if(_alcedo_id_otool_result EQUAL 0)
+                    string(REPLACE \"\\n\" \";\" _alcedo_id_lines \"\${_alcedo_id_otool_output}\")
+                    list(LENGTH _alcedo_id_lines _alcedo_id_line_count)
+                    if(_alcedo_id_line_count GREATER 1)
+                        list(GET _alcedo_id_lines 1 _alcedo_id_line)
+                        string(STRIP \"\${_alcedo_id_line}\" _alcedo_id)
+                        if(\"\${_alcedo_id}\" MATCHES \"^/\")
+                            execute_process(
+                                COMMAND /usr/bin/install_name_tool
+                                        -id \"@rpath/\${_alcedo_dylib_name}\"
+                                        \"\${_alcedo_dylib}\"
+                                RESULT_VARIABLE _alcedo_id_set_result
+                            )
+                            if(NOT _alcedo_id_set_result EQUAL 0)
+                                message(FATAL_ERROR
+                                    \"Failed to set install name for \${_alcedo_dylib}\")
+                            endif()
+                        endif()
+                    endif()
+                endif()
+            endforeach()
+        endwhile()
+        message(STATUS \"Resolved bundle dylib dependencies in \${_alcedo_resolve_round} round(s)\")
+
         # Optional sanity check for the patched libgfortran.
         execute_process(
             COMMAND /usr/bin/otool -L \"\${_alcedo_fw_dir}/libgfortran.5.dylib\"

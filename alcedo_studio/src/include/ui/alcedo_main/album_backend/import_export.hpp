@@ -245,6 +245,10 @@ class ImportExportHandler final : public QObject {
  signals:
   void ImportStateChanged();
   void importStateChanged();
+  /// Published once when an import finishes, with the created entries (ids and source paths).
+  /// Observers such as the temporary handoff registry use it to learn which imported assets
+  /// came from a cache directory.
+  void ImportLogReady(const std::shared_ptr<const ImportLogSnapshot>& snapshot);
   void ExportStateChanged();
   void exportStateChanged();
   /// Emitted once when an export run ends (exportInFlight becomes false), after the final

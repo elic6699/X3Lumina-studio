@@ -21,6 +21,10 @@ struct AutomationSessionFile {
   /// `headless` or `gui`.
   QString   host_mode;
   QString   project_path;
+  /// Absolute path of the Studio-managed directory for temporary export handoff files.
+  /// Empty when no handoff cache is configured. Absent in session files written before this
+  /// field was added, and read back as empty.
+  QString   cache_directory;
   QDateTime started_at;
 };
 

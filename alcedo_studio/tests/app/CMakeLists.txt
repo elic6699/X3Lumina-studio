@@ -52,6 +52,15 @@ gtest_discover_tests(RawImportLookSettingsTest TEST_PREFIX "RawImportLookSetting
     PROPERTIES LABELS "ci_core_flow")
 alcedo_register_test_target(RawImportLookSettingsTest app ci_core)
 
+add_executable(TemporaryAssetRegistryTest
+    ${ALCEDO_TEST_ROOT}/app/temporary_asset_registry_test.cpp)
+target_include_directories(TemporaryAssetRegistryTest PUBLIC ${ALCEDO_INCLUDE_DIR})
+target_link_libraries(TemporaryAssetRegistryTest PRIVATE TemporaryAssetRegistry
+    GTest::gtest_main)
+gtest_discover_tests(TemporaryAssetRegistryTest TEST_PREFIX "TemporaryAssetRegistryTest."
+    PROPERTIES LABELS "ci_core_flow")
+alcedo_register_test_target(TemporaryAssetRegistryTest app ci_core)
+
 add_executable(LutPackageServiceTest
     ${ALCEDO_TEST_ROOT}/app/lut_package_service_test.cpp
     ${ALCEDO_TEST_ROOT}/app/download_service_test_main.cpp)

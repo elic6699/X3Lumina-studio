@@ -49,6 +49,7 @@ auto ToJson(const AutomationSessionFile& file) -> QJsonObject {
                      {"pid", static_cast<double>(file.pid)},
                      {"host_mode", file.host_mode},
                      {"project_path", file.project_path},
+                     {"cache_directory", file.cache_directory},
                      {"started_at", file.started_at.toUTC().toString(Qt::ISODate)}};
 }
 
@@ -172,7 +173,13 @@ auto ReadAutomationSessionFile(const QString& path, QString* error)
   file.pid              = static_cast<qint64>(object.value("pid").toDouble());
   file.host_mode        = host_mode;
   file.project_path     = object.value("project_path").toString();
-  file.started_at       = started_at;
+  // Optional: session files written before the handoff cache existed have no such field.
+  // A missing, null, or non-string value reads as an empty path, which disables the handoff.
+  const QJsonValue cache_directory = object.value("cache_directory");
+  if (cache_directory.isString()) {
+    file.cache_directory = cache_directory.toString();
+  }
+  file.started_at = started_at;
   return file;
 }
 

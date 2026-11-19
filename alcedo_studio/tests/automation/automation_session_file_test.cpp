@@ -65,6 +65,49 @@ TEST(AutomationSessionFileTest, WrittenFileReadsBackWithSameFields) {
   EXPECT_EQ(read->started_at, written.started_at);
 }
 
+TEST(AutomationSessionFileTest, CacheDirectoryRoundTrips) {
+  QTemporaryDir dir;
+  ASSERT_TRUE(dir.isValid());
+  AutomationSessionFile written =
+      MakeSessionFile(QStringLiteral("cached"), QCoreApplication::applicationPid());
+  written.cache_directory = QStringLiteral("/Users/tester/Library/Application Support/Alcedo/handoff-cache");
+
+  QString error;
+  ASSERT_TRUE(WriteAutomationSessionFile(dir.filePath("sessions"), written, &error))
+      << error.toStdString();
+  const auto read = ReadAutomationSessionFile(
+      AutomationSessionFilePath(dir.filePath("sessions"), QStringLiteral("cached")), &error);
+
+  ASSERT_TRUE(read.has_value()) << error.toStdString();
+  EXPECT_EQ(read->cache_directory, written.cache_directory);
+}
+
+TEST(AutomationSessionFileTest, MissingCacheDirectoryReadsAsEmpty) {
+  QTemporaryDir dir;
+  ASSERT_TRUE(dir.isValid());
+  const AutomationSessionFile written =
+      MakeSessionFile(QStringLiteral("nocache"), QCoreApplication::applicationPid());
+  ASSERT_TRUE(written.cache_directory.isEmpty());
+
+  ASSERT_TRUE(WriteAutomationSessionFile(dir.path(), written));
+
+  // A session file written before the field existed omits it entirely.
+  const QString path = AutomationSessionFilePath(dir.path(), QStringLiteral("nocache"));
+  QFile         file(path);
+  ASSERT_TRUE(file.open(QIODevice::ReadOnly));
+  QJsonObject object = QJsonDocument::fromJson(file.readAll()).object();
+  file.close();
+  object.remove(QStringLiteral("cache_directory"));
+  ASSERT_TRUE(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+  file.write(QJsonDocument(object).toJson(QJsonDocument::Compact));
+  file.close();
+
+  QString     error;
+  const auto  read = ReadAutomationSessionFile(path, &error);
+  ASSERT_TRUE(read.has_value()) << error.toStdString();
+  EXPECT_TRUE(read->cache_directory.isEmpty());
+}
+
 TEST(AutomationSessionFileTest, DeadProcessFileIsReportedStale) {
   QTemporaryDir dir;
   ASSERT_TRUE(dir.isValid());
