@@ -577,6 +577,11 @@ alcedo_register_test_target(ApplicationModuleHostShutdownTest ui)
 def_ui_test(ApplicationModuleHostIdleTest application_module_host_idle_test.cpp)
 alcedo_register_test_target(ApplicationModuleHostIdleTest ui)
 
+# Temporary export handoff: assets imported from the Studio cache are discarded; normal
+# imports are not. Standalone because setTestModeEnabled(true) is process-wide.
+def_ui_test(HandoffAssetLifecycleTest handoff_asset_lifecycle_test.cpp)
+alcedo_register_test_target(HandoffAssetLifecycleTest ui)
+
 # Project launch and close owners moved out of QML (automation plan AU4).
 def_ui_test(ApplicationCloseCoordinatorTest application_close_coordinator_test.cpp)
 alcedo_register_test_target(ApplicationCloseCoordinatorTest ui)

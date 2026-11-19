@@ -26,6 +26,17 @@ target_compile_definitions(RasterColorDescriptionTest PRIVATE
 gtest_discover_tests(RasterColorDescriptionTest TEST_PREFIX "RasterColorDescriptionTest.")
 alcedo_register_test_target(RasterColorDescriptionTest image)
 
+# Phase-4 proof of the x3lumina -> Studio export handoff: a byte-exact cache copy keeps
+# the wide-gamut ICC description and leaves negative / over-range linear code values intact.
+add_executable(HandoffGamutPreservationTest
+  ${ALCEDO_TEST_ROOT}/image/handoff_gamut_preservation_test.cpp)
+target_include_directories(HandoffGamutPreservationTest PUBLIC ${ALCEDO_INCLUDE_DIR})
+target_link_libraries(HandoffGamutPreservationTest PRIVATE GTest::gtest_main Image Sha256Digest)
+target_compile_definitions(HandoffGamutPreservationTest PRIVATE
+  ALCEDO_RASTER_FIXTURE_DIR="${ALCEDO_TEST_ROOT}/resources/raster")
+gtest_discover_tests(HandoffGamutPreservationTest TEST_PREFIX "HandoffGamutPreservationTest.")
+alcedo_register_test_target(HandoffGamutPreservationTest image)
+
 # Runtime DNG profile cache: LRU eviction, sharing by fingerprint, reload after file change.
 add_executable(DngColorProfileCacheTest ${ALCEDO_TEST_ROOT}/image/dng_color_profile_cache_test.cpp)
 target_include_directories(DngColorProfileCacheTest PUBLIC ${ALCEDO_INCLUDE_DIR})

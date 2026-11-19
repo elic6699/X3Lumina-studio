@@ -219,19 +219,32 @@ and running first.
 
 Release condition, not optional cleanup.
 
-- **Equivalence test (required):** for a real 16-bit TIFF with an embedded ICC and a real DNG,
-  import from the cache and import the same file from a normal location. Compare decoded
-  `PreparedRawInput` host planes, extents, `RasterColorDescription` or DNG colour context,
-  `icc_sha256_`, and a rendered export. They must match exactly.
-- **Wide-gamut test (required):** import a ProPhotoRGB 16-bit TIFF with pixel values outside
-  sRGB. Assert the description is not `DefaultSrgb`, the ICC hash is present, and decoded F32
-  values are neither clamped to [0, 1] nor reduced to sRGB primaries.
-- **Cleanup test:** after editor close, assert the element no longer resolves through
-  `ReadAlbumFileRows`, no pipeline row remains, and the cache file does not exist.
-- **Limits:** cap the cache directory size and file count; reject a handoff file larger than
-  the configured limit with a clear error and no library asset created.
-- **Docs:** update `x3lumina-external-editor.md` section 3b with the third destination and the
-  temporary-asset lifecycle.
+- **Byte-equivalence test (done):** `tests/image/handoff_gamut_preservation_test.cpp` reproduces
+  the companion app's exact write (`Data(contentsOf:)` + atomic write) on ProPhoto 16-bit,
+  Rec.2020 16-bit, and float32-linear TIFF fixtures. It asserts byte-identical copies, equal
+  `RasterColorDescription` (primaries, transfer, peak, `icc_sha256_`), and wide primaries that
+  really resolve from the embedded ICC rather than a `DefaultSrgb` fallback. Because the cache
+  file is byte-identical to the export, every downstream decode consumes the same bytes and
+  yields the same planes and colour context.
+- **Wide-gamut code-value test (done):** the same suite writes negative and over-range (>1.0)
+  linear floats into a real float32 TIFF strip, copies it through the cache path, and asserts
+  the exact bit patterns and the ICC survive. A future change that clamps to [0, 1] or maps to
+  sRGB/P3 fails these tests.
+- **Lifecycle tests (done):** `tests/ui/handoff_asset_lifecycle_test.cpp` publishes the import
+  log through the production signal and asserts that a source file inside the cache is tracked
+  and its cache file removed at shutdown, while a normal import is never treated as temporary.
+  `tests/ui/album_backend_image_delete_test.cpp` covers the forced library-level delete on a
+  subfolder. Neither needs a GPU editor backend.
+- **Still manual before public release (not automated here):**
+  - a real DNG exported by x3lumina, handed off to a running GUI Studio, opened to
+    `Interactive`, closed, and checked end to end (the local CI RAW fixtures are LFS
+    placeholders, so an editor `Interactive` E2E cannot run in this checkout);
+  - a rendered-export byte comparison of cache import versus normal import;
+  - a cache size and file-count cap. The cache is currently cleared at every Studio start
+    (`PrepareHandoffCacheDirectory`) and drained on editor close and shutdown, so it does not
+    grow without bound across sessions; only a single-session cap is not enforced.
+- **Docs (done):** `x3lumina-external-editor.md` section 3b carries the third destination and
+  the temporary-asset lifecycle.
 
 ## Files changed, by area
 
@@ -242,8 +255,8 @@ Release condition, not optional cleanup.
 | Import completion | the `ImportExportHandler` completion path that resolves imported ids |
 | Forced delete | `image_controller.hpp/.cpp`, `library_mutation_operations.hpp/.cpp` (library-level delete for temporary assets) |
 | Build | `src/app/CMakeLists.txt` (new registry library), `src/ui/alcedo_main/CMakeLists.txt` (link) |
-| Tests | the app test target that covers import and session files |
-| Companion app | session-file cache path, export destination, CLI calls (separate repository) |
+| Tests | `tests/app/temporary_asset_registry_test.cpp`, `tests/automation/{automation_session_file_test,handoff_cache_test}.cpp`, `tests/image/handoff_gamut_preservation_test.cpp`, `tests/ui/handoff_asset_lifecycle_test.cpp`, `tests/ui/album_backend_image_delete_test.cpp` |
+| Companion app (done) | `outputs/X3FExtractor/Sources/X3FExtractor/{AlcedoHandoff,ExternalLaunch,Views}.swift` (separate repository) |
 | Docs | `docs/x3lumina-external-editor.md` |
 
 ## Risks and how they are handled

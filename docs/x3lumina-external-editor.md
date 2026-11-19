@@ -205,9 +205,14 @@ Notes:
   import path resolves the file's own ICC (16-bit TIFF) or DNG colour metadata; no step
   clamps to sRGB/P3 or cuts negative or out-of-range linear values.
 
-Relevant companion-app files: `ExternalLaunch.swift` (post-export dispatch, foreground/maximize),
-`AlcedoHandoff.swift` (CLI chain), `Engine.swift` (`onExportFinished` + exported URL list),
-`Views.swift` (`ExportDestinationSheet`).
+Relevant companion-app files (repo `outputs/X3FExtractor/Sources/X3FExtractor/`):
+`AlcedoHandoff.swift` — `guiSession()` reads `session_name` and the optional `cache_directory`
+from the live GUI session file; `handOffToCache()` copies the exported bytes into that cache
+under a UUID-suffixed name and runs the shared `performHandoff()` CLI chain; on failure it
+removes the cache copy and keeps the user's export intact. `ExternalLaunch.swift` —
+`ExportAfterAction.toCache` dispatches to `handOffToCache()`. `Views.swift` —
+`ExportDestinationSheet` offers the third choice. `Engine.swift` — `onExportFinished` supplies
+the exported URL list.
 
 ## 4. Batch export (x3lumina CLI)
 
