@@ -230,6 +230,13 @@ Release condition, not optional cleanup.
   linear floats into a real float32 TIFF strip, copies it through the cache path, and asserts
   the exact bit patterns and the ICC survive. A future change that clamps to [0, 1] or maps to
   sRGB/P3 fails these tests.
+- **Decode-equivalence test (done):** the same suite feeds the identical bytes from two distinct
+  paths — one standing in for the ordinary export location, one for the Studio cache — through
+  `RasterInputLoader::LoadEncoded` for all three wide-gamut TIFFs. It asserts the decoded
+  `PreparedRawInput` matches on `input_kind`, all extents, pixel format, stride, `source_key`,
+  ICC-conversion flag and digest, and the entire host plane byte for byte. This proves a cache
+  import decodes exactly like a normal import, without a GPU editor backend or an LFS RAW
+  fixture (which is why the rendered-export comparison can stay manual, see below).
 - **Lifecycle tests (done):** `tests/ui/handoff_asset_lifecycle_test.cpp` publishes the import
   log through the production signal and asserts that a source file inside the cache is tracked
   and its cache file removed at shutdown, while a normal import is never treated as temporary.
@@ -239,7 +246,9 @@ Release condition, not optional cleanup.
   - a real DNG exported by x3lumina, handed off to a running GUI Studio, opened to
     `Interactive`, closed, and checked end to end (the local CI RAW fixtures are LFS
     placeholders, so an editor `Interactive` E2E cannot run in this checkout);
-  - a rendered-export byte comparison of cache import versus normal import;
+  - a *rendered* export byte comparison of cache import versus normal import through the GPU
+    executor. The decode boundary is already covered automatically above; the render step needs
+    the GPU backend and a real image, so it stays a manual check;
   - a cache size and file-count cap. The cache is currently cleared at every Studio start
     (`PrepareHandoffCacheDirectory`) and drained on editor close and shutdown, so it does not
     grow without bound across sessions; only a single-session cap is not enforced.

@@ -16,6 +16,7 @@
 ///   * the wide-gamut primaries are really resolved from the embedded ICC, not a relabel;
 ///   * linear pixels carrying negative and >1.0 code values survive the copy unchanged.
 
+#include "edit/input/raster_input_loader.hpp"
 #include "image/raster_color_description.hpp"
 #include "utils/hash/sha256.hpp"
 
@@ -126,6 +127,66 @@ TEST(HandoffGamutPreservationTest, Rec2020TiffKeepsIccAndPrimariesThroughCacheCo
 TEST(HandoffGamutPreservationTest, Float32LinearTiffKeepsDescriptionThroughCacheCopy) {
   ExpectWideGamutSurvivesCacheCopy("float32_linear_icc.tif", RasterFileKind::Tiff,
                                    color::GamutPrimariesXy(color::ColorGamutId::Rec709));
+}
+
+// -------------------------------------------------------------------------------------------
+// Decode level: a cache import and a normal import of the same bytes decode identically.
+// -------------------------------------------------------------------------------------------
+
+/// `RasterInputLoader::LoadEncoded` consumes only a byte span, never a file path. A handoff
+/// import and a normal import of the same export therefore have to produce the same decoded
+/// host plane, extents, source key and colour context. This is the decode-boundary proof of
+/// the plan's claim that "every downstream decode consumes the same bytes and yields the same
+/// planes and colour context", without needing a GPU editor backend or an LFS RAW fixture.
+void ExpectCacheImportDecodesLikeNormalImport(const std::string& fixture, RasterFileKind kind) {
+  const auto temp = fs::temp_directory_path() / "alcedo-handoff-decode-test";
+  std::error_code ec;
+  fs::create_directories(temp, ec);
+  ASSERT_FALSE(ec) << ec.message();
+
+  const fs::path source = FixturePath(fixture);
+  // Two distinct paths, identical bytes: the ordinary export location and the Studio cache.
+  const fs::path normal_copy = temp / ("normal_" + fixture);
+  const fs::path cache_copy = temp / ("cached_" + fixture);
+  WriteBytes(normal_copy, ReadBytes(source));
+  SimulateCacheCopy(source, cache_copy);
+
+  const auto normal_input =
+      RasterInputLoader::LoadEncoded(ReadBytes(normal_copy), DecodeRes::FULL, kind);
+  const auto cache_input =
+      RasterInputLoader::LoadEncoded(ReadBytes(cache_copy), DecodeRes::FULL, kind);
+
+  ASSERT_EQ(normal_input.input_kind, RawInputKind::RasterRgb);
+  EXPECT_EQ(cache_input.input_kind, normal_input.input_kind);
+  EXPECT_EQ(cache_input.host_extent, normal_input.host_extent);
+  EXPECT_EQ(cache_input.develop_output_extent, normal_input.develop_output_extent);
+  EXPECT_EQ(cache_input.full_reference_extent, normal_input.full_reference_extent);
+  EXPECT_EQ(cache_input.downsample_passes, normal_input.downsample_passes);
+  EXPECT_EQ(cache_input.pixels.format, normal_input.pixels.format);
+  EXPECT_EQ(cache_input.pixels.extent, normal_input.pixels.extent);
+  EXPECT_EQ(cache_input.pixels.stride_bytes, normal_input.pixels.stride_bytes);
+  EXPECT_EQ(cache_input.source_key, normal_input.source_key)
+      << "the content identity of a cache import must match a normal import";
+  EXPECT_EQ(cache_input.raster_lut_icc_converted, normal_input.raster_lut_icc_converted);
+  EXPECT_EQ(cache_input.raster_icc_sha256, normal_input.raster_icc_sha256);
+
+  const auto normal_plane = normal_input.pixels.Span();
+  const auto cache_plane = cache_input.pixels.Span();
+  ASSERT_EQ(cache_plane.size(), normal_plane.size());
+  EXPECT_EQ(std::memcmp(cache_plane.data(), normal_plane.data(), normal_plane.size()), 0)
+      << "decoded host-plane code values differ between cache and normal import";
+}
+
+TEST(HandoffGamutPreservationTest, ProPhotoCacheImportDecodesLikeNormalImport) {
+  ExpectCacheImportDecodesLikeNormalImport("prophoto_icc_16bit.tif", RasterFileKind::Tiff);
+}
+
+TEST(HandoffGamutPreservationTest, Rec2020CacheImportDecodesLikeNormalImport) {
+  ExpectCacheImportDecodesLikeNormalImport("rec2020_icc_16bit.tif", RasterFileKind::Tiff);
+}
+
+TEST(HandoffGamutPreservationTest, Float32LinearCacheImportDecodesLikeNormalImport) {
+  ExpectCacheImportDecodesLikeNormalImport("float32_linear_icc.tif", RasterFileKind::Tiff);
 }
 
 // -------------------------------------------------------------------------------------------

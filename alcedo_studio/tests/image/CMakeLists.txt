@@ -31,7 +31,8 @@ alcedo_register_test_target(RasterColorDescriptionTest image)
 add_executable(HandoffGamutPreservationTest
   ${ALCEDO_TEST_ROOT}/image/handoff_gamut_preservation_test.cpp)
 target_include_directories(HandoffGamutPreservationTest PUBLIC ${ALCEDO_INCLUDE_DIR})
-target_link_libraries(HandoffGamutPreservationTest PRIVATE GTest::gtest_main Image Sha256Digest)
+target_link_libraries(HandoffGamutPreservationTest PRIVATE GTest::gtest_main EditInput Image
+  Sha256Digest)
 target_compile_definitions(HandoffGamutPreservationTest PRIVATE
   ALCEDO_RASTER_FIXTURE_DIR="${ALCEDO_TEST_ROOT}/resources/raster")
 gtest_discover_tests(HandoffGamutPreservationTest TEST_PREFIX "HandoffGamutPreservationTest.")
