@@ -222,6 +222,15 @@ class ApplicationModuleHost final : public QObject {
     return editor_session_scheduler_.get();
   }
 
+  /// Opens an existing library photo in the built-in editor while its decoding source is
+  /// temporarily redirected to a handoff DNG/TIFF. The element, its stored X3F/X3I path and its
+  /// thumbnail are left untouched; only editor input and full-resolution export read the proxy.
+  /// @p error receives a user-facing reason when the proxy cannot be established.
+  [[nodiscard]] auto OpenHandoffEditor(sl_element_id_t element_id, image_id_t image_id,
+                                       const std::filesystem::path& source_path,
+                                       const std::filesystem::path& cache_path,
+                                       QString* error) -> bool;
+
   /// True when no background task runs, no import runs, and no export is in flight. The agent
   /// control task marks control, not work, so it does not count.
   [[nodiscard]] auto IsIdle() const -> bool;

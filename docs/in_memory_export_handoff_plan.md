@@ -10,6 +10,12 @@ This is an extension of the protocol in `x3lumina-external-editor.md`, section 3
 not replace the existing disk handoff. Both paths stay available; the user picks one at export
 time in the companion app.
 
+**Later refinement (2026-11-19).** The import-then-delete version below is retained as the
+compatibility fallback. The preferred option 3 flow now uses a decoding proxy: Studio opens the
+original X3F/X3I element and redirects only editor input and export decoding to the cached
+DNG/TIFF, so no temporary library photo ever appears. The wide-gamut invariants and the
+cache-file lifecycle are unchanged; only the library side effect is removed.
+
 ## Decision change found during design (recorded per AGENTS.md)
 
 The first version of this plan proposed a pure in-memory path: put the encoded bytes in an

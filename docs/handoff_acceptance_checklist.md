@@ -9,6 +9,8 @@ The automated coverage already proves, on the CPU with real wide-gamut TIFFs:
   (`tests/image/handoff_gamut_preservation_test.cpp`);
 - negative and over-range linear floats are not clipped (same file);
 - a cache import decodes to the same `PreparedRawInput` as a normal import (same file);
+- a decoding-proxy entry is read without removal, replaced, taken, and cleared
+  (`tests/app/handoff_proxy_registry_test.cpp`);
 - a cache-origin asset is tracked and its file removed at shutdown, while a normal import is
   never discarded (`tests/ui/handoff_asset_lifecycle_test.cpp`);
 - a forced library-level delete removes the row and pipeline even from a subfolder
@@ -51,25 +53,34 @@ Checks the whole path with a file the real `x3lumina` pipeline produced.
    with the photo selected (the external bridge, not Studio's own editor).
 2. In `x3lumina`, export as **DNG** and choose **回传并自动清理**. Note the exported basename.
 3. Confirm all of the following:
-   - Studio comes to the foreground and opens the DNG in its **own** editor (Develop panels
-     present; no second `x3lumina` window). If Studio was on a subfolder album, this still works.
+   - Studio comes to the foreground and opens the **same X3F/X3I** in its own editor (Develop
+     panels present; no second `x3lumina` window). The library still shows exactly one photo:
+     no DNG/TIFF duplicate is imported, and the original thumbnail/name/location are unchanged.
    - The cache directory now contains one file whose name is the export stem plus a UUID
      suffix. Its bytes equal a copy exported to a normal directory with the same settings
      (`shasum -a 256` on both).
    - The editor shows the wide-gamut image with correct colours. Open the colour/ICC readout
      and confirm the DNG colour metadata is present, not a default sRGB label.
-4. Close the editor back to the library. Then check that all three are gone:
+   - The proxy keeps the library row on the original X3F, so the editor session's Develop
+     document still belongs to the X3F. The renderer/export bind a **render-only clone** of that
+     snapshot to the handoff file's own colour description (`app/handoff_color_rebind.cpp`):
+     the DNG's embedded matrices/as-shot neutral/DNG profile, or the TIFF's embedded ICC. There
+     must be **no global colour cast** and no black frame — the tell-tale sign the X3F camera
+     matrix was applied to DNG bytes. The working document, stored history, `image_path_` and the
+     X3F file are never modified; the rebind disappears with the proxy on close.
+4. Close the editor back to the library. Then check:
    ```sh
    # cache file removed
    ls -la ~/Library/Application Support/Alcedo/Alcedo/handoff-cache
-   # library row removed — the exported stem must not resolve any more
+   # no temporary photo was ever imported
    alcedo-cli --json --session gui call search.query "{\"text\":\"<export-stem>\",\"mode\":\"fuzzy\"}"
+   # the original X3F is still present in the library and on disk
    ```
-   Repeat step 1–4 with a subfolder selected in Studio to confirm the library-level delete
-   leaves no row there either.
+   Repeat step 1–4 with a subfolder selected in Studio: the photo count must stay the same.
 
-**Pass**: editor opens in Studio; cache bytes match a normal export; colours and DNG metadata
-are intact; on close the cache file and the library row are both gone from root and subfolder.
+**Pass**: editor opens the original photo while reading the handoff bytes; cache bytes match a
+normal export; colours and DNG metadata are intact; on close only the cache file is gone and no
+duplicate library row exists in root or subfolder.
 
 ## Step 2 — rendered export comparison
 
@@ -77,19 +88,19 @@ The decode boundary is already covered automatically. This step checks the GPU r
 image-writer path after import.
 
 1. Export the same 16-bit TIFF twice from `x3lumina` with identical settings. Choose
-   **回传 Alcedo 继续编辑** (option 2) for the first, so Studio opens the copy in the ordinary
-   export directory. Choose **回传并自动清理** (option 3) for the second. Option 3 also leaves a
-   file in the export directory; the copy Studio opens is the byte-identical one in the cache.
+   **回传 Alcedo 继续编辑** (option 2) for the first, so Studio imports the exported copy as a
+   separate photo. Choose **回传并自动清理** (option 3) for the second, so Studio keeps the
+   original X3F and only redirects its decoding source to the cache copy.
 2. In Studio, apply the same Develop adjustments and the same export preset to both, then
    export each to a fresh directory.
 3. Compare the two exports:
    ```sh
-   shasum -a 256 <normal-import>/export.tif <cache-import>/export.tif
+   shasum -a 256 <imported-copy>/export.tif <original-x3f-with-proxy>/export.tif
    ```
    The files must be byte-identical. If a writer embeds a timestamp, compare pixels instead
    with an image tool that reports exact sample values; the samples must match.
 
-**Pass**: normal-import and cache-import renders are byte-identical (or pixel-identical where
+**Pass**: imported-copy and proxy-backed renders are byte-identical (or pixel-identical where
 the container embeds volatile metadata).
 
 ## Step 3 — cache capacity behaviour
@@ -97,11 +108,12 @@ the container embeds volatile metadata).
 There is no hard size or file-count limit. This step verifies the cache cannot accumulate
 across sessions.
 
-1. With Studio running, repeat step 1 twice more so several temporary assets exist at once.
-   Confirm the cache holds one file per open/imported handoff.
-2. Close each editor and confirm files disappear as each asset is discarded.
-3. Quit Studio while a handoff asset is still open, then check the cache: shutdown removes any
-   remaining tracked file.
+1. With Studio running, repeat step 1 twice more (sequentially) so several handoff cache files
+   are created. Confirm the cache holds one file per proxy handoff.
+2. Close each editor and confirm only that file disappears; the library photo count is unchanged
+   every time.
+3. Quit Studio while a proxy handoff is still open, then check the cache: shutdown removes any
+   remaining proxy cache file.
 4. As a final check, place a dummy file in the cache, start Studio, and confirm
    `PrepareHandoffCacheDirectory` cleared it at startup.
 

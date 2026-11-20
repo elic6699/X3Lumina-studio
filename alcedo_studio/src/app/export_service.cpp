@@ -34,6 +34,8 @@
 #include "sleeve/sleeve_filesystem.hpp"
 #include "type/type.hpp"
 
+#include "app/handoff_color_rebind.hpp"
+#include "app/handoff_proxy_registry.hpp"
 #include "app/pipeline_service.hpp"
 
 namespace alcedo {
@@ -150,7 +152,12 @@ void ExportService::EnqueueExportTask(const ExportTask& task) {
   if (!pipeline_service_) {
     throw std::runtime_error("ExportService: pipeline service is unavailable");
   }
-  auto         snapshot = pipeline_service_->AcquireCommittedSnapshot(task.sleeve_id_);
+  auto snapshot = pipeline_service_->AcquireCommittedSnapshot(task.sleeve_id_);
+  // Handoff proxy: the export reads the external DNG/TIFF bytes (see img_src_path below) while the
+  // committed snapshot still carries the original X3F colour description. Bind a render-only clone
+  // to the handoff file's own colour metadata so the exported colour matches the preview. The
+  // library document and stored history are not modified.
+  snapshot      = RebindSnapshotColorIfHandoff(task.image_id_, snapshot);
   QueuedExport queued{.task_ = task, .snapshot_ = snapshot};
   auto&        recipe = *queued.task_.recipe_;
   if (!recipe.output_color_.has_value()) {
@@ -216,7 +223,15 @@ auto ExportService::RunExportRenderTask(const QueuedExport& queued) -> ExportRes
       throw std::runtime_error("[ERROR] ExportService: Failed to load image for id " +
                                std::to_string(task.image_id_));
     }
-    auto       img_src_path    = source_img->image_path_;
+    auto img_src_path = source_img->image_path_;
+    // A handoff proxy redirects the full-resolution export source to the external editor's
+    // DNG/TIFF, while the library image (element id, name, history, stored path) is untouched.
+    // The rest of this function then sees exactly the DNG path a normal handoff import would
+    // have produced, so decoding, colour description and ICC handling are unchanged: the
+    // wide-gamut bytes and the DNG's own colour metadata are preserved.
+    if (const auto proxy = HandoffProxyRegistry::Instance().ProxyPathFor(task.image_id_)) {
+      img_src_path = *proxy;
+    }
     const auto export_metadata = ResolveImageExportMetadata(source_img);
 
     stage                      = "render";

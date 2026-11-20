@@ -1475,6 +1475,14 @@ if(APPLE AND ALCEDO_MACOS_BUNDLE AND TARGET ${ALCEDO_MAIN_BIN})
     list(REMOVE_DUPLICATES _alcedo_runtime_dirs)
     list(JOIN _alcedo_runtime_dirs ";" _alcedo_runtime_dirs_joined)
 
+    # macdeployqt copies dylibs but can leave developer-machine LC_RPATH values
+    # (Homebrew, /opt, /usr/local) inside them.  Those rpaths can take priority
+    # over @rpath references and load a second OpenMP runtime at startup, which
+    # aborts with "OMP: Error #15".  Normalize all bundled load commands after
+    # dependency resolution and before code signing.
+    set(_alcedo_normalize_macos_script
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cmake/normalize_macos_dylib_paths.sh")
+
     # Qt/macdeployqt already does the main deployment pass.
     # Here we only patch the OpenBLAS -> libgfortran -> libquadmath/libgcc_s chain.
     install(CODE
@@ -1704,6 +1712,20 @@ if(APPLE AND ALCEDO_MACOS_BUNDLE AND TARGET ${ALCEDO_MAIN_BIN})
             endforeach()
         endwhile()
         message(STATUS \"Resolved bundle dylib dependencies in \${_alcedo_resolve_round} round(s)\")
+
+        # Finalize bundle-local bindings. This removes Homebrew LC_RPATH values
+        # that would otherwise override bundled siblings and duplicate libomp.
+        execute_process(
+            COMMAND /bin/sh \"${_alcedo_normalize_macos_script}\" \"\${_alcedo_app_path}\"
+            RESULT_VARIABLE _alcedo_normalize_result
+            OUTPUT_VARIABLE _alcedo_normalize_output
+            ERROR_VARIABLE _alcedo_normalize_error
+        )
+        if(NOT _alcedo_normalize_result EQUAL 0)
+            message(FATAL_ERROR
+                \"Failed to normalize bundled dylib paths: \${_alcedo_normalize_error}\")
+        endif()
+        message(STATUS \"\${_alcedo_normalize_output}\")
 
         # Optional sanity check for the patched libgfortran.
         execute_process(

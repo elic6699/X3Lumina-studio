@@ -61,6 +61,26 @@ gtest_discover_tests(TemporaryAssetRegistryTest TEST_PREFIX "TemporaryAssetRegis
     PROPERTIES LABELS "ci_core_flow")
 alcedo_register_test_target(TemporaryAssetRegistryTest app ci_core)
 
+# Handoff decode-source proxy registry (header-only, process-wide).
+add_executable(HandoffProxyRegistryTest
+    ${ALCEDO_TEST_ROOT}/app/handoff_proxy_registry_test.cpp)
+target_include_directories(HandoffProxyRegistryTest PUBLIC ${ALCEDO_INCLUDE_DIR})
+target_link_libraries(HandoffProxyRegistryTest PRIVATE GTest::gtest_main)
+gtest_discover_tests(HandoffProxyRegistryTest TEST_PREFIX "HandoffProxyRegistryTest."
+    PROPERTIES LABELS "ci_core_flow")
+alcedo_register_test_target(HandoffProxyRegistryTest app ci_core)
+
+# Handoff snapshot colour rebind (render-only clone bound to the handoff DNG/TIFF metadata).
+add_executable(HandoffColorRebindTest
+    ${ALCEDO_TEST_ROOT}/app/handoff_color_rebind_test.cpp)
+target_include_directories(HandoffColorRebindTest PUBLIC ${ALCEDO_INCLUDE_DIR})
+target_compile_definitions(HandoffColorRebindTest PRIVATE
+    ALCEDO_RASTER_FIXTURE_DIR="${ALCEDO_TEST_ROOT}/resources/raster")
+target_link_libraries(HandoffColorRebindTest PRIVATE ExportService GTest::gtest_main)
+gtest_discover_tests(HandoffColorRebindTest TEST_PREFIX "HandoffColorRebindTest."
+    PROPERTIES LABELS "ci_core_flow")
+alcedo_register_test_target(HandoffColorRebindTest app ci_core)
+
 add_executable(LutPackageServiceTest
     ${ALCEDO_TEST_ROOT}/app/lut_package_service_test.cpp
     ${ALCEDO_TEST_ROOT}/app/download_service_test_main.cpp)

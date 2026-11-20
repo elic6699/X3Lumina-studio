@@ -803,6 +803,10 @@ def_library(ThumbnailDiskCacheService
 )
 
 def_library(ExportService
-    SOURCES "${ALCEDO_APP_ROOT}/export_service.cpp"
+    SOURCES
+        "${ALCEDO_APP_ROOT}/export_service.cpp"
+        "${ALCEDO_APP_ROOT}/handoff_color_rebind.cpp"
+        "${ALCEDO_INCLUDE_ROOT}/app/handoff_color_rebind.hpp"
     PUBLIC_DEPS ExportRecipe ImageWriter ImageLoader ImagePoolService PipelineMgmtService PipelineScheduler ThreadPool
+    PRIVATE_DEPS Image EditGraph
 )

@@ -75,11 +75,16 @@ struct TiffContainerInfo {
   uint16_t               sample_format_     = 1;
   /// 0/1 gray, 2 RGB, 3 palette, 5 separated (CMYK), 6 YCbCr, 32803 CFA, 34892 LinearRaw.
   uint16_t               photometric_       = 0;
+  /// TIFF compression tag, 1 = none, 7 = JPEG.
+  uint16_t               compression_       = 1;
   /// Orientation tag value 1..8, 1 when absent.
   uint16_t               orientation_       = 1;
   std::vector<std::byte> icc_profile_;
   std::string            make_;
   bool                   has_dng_version_ = false;
+  /// DNG/RAW container tag 50708. Present in several TIFF-based RAW files even when their
+  /// first IFD exposes a rendered preview with an ordinary RGB/YCbCr photometric.
+  bool                   has_unique_camera_model_ = false;
 };
 
 /// @throws RasterContainerError when the header or the first directory is malformed.

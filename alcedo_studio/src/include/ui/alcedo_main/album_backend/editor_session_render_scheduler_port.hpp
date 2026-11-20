@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -56,6 +57,10 @@ struct EditorRenderSessionContext {
   /// Presentation sink identity stamped at open/switch. Live `IFrameSink*` is
   /// resolved only at pipeline submit; this id is the session-scoped identity.
   alcedo::PresentationSinkId           presentation_sink_id = 0;
+  /// Identifies the byte source the payload was loaded from: the handoff proxy path when one is
+  /// active, otherwise empty. A handoff can redirect a still-open image from its library X3F to
+  /// an external TIFF/DNG; the cached Image/ImageBuffer must not be reused across that change.
+  std::filesystem::path                decode_source_{};
   std::shared_ptr<alcedo::Image>       image;
   std::shared_ptr<alcedo::ImageBuffer> input;
 };

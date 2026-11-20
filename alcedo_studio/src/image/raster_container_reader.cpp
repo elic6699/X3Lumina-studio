@@ -408,6 +408,9 @@ auto ReadTiffContainer(std::span<const std::byte> file_bytes) -> TiffContainerIn
   if (const auto* entry = FindEntry(entries, 258)) {
     info.bits_per_sample_ = static_cast<uint16_t>(tiff.Uint(*entry));
   }
+  if (const auto* entry = FindEntry(entries, 259)) {
+    info.compression_ = static_cast<uint16_t>(tiff.Uint(*entry));
+  }
   if (const auto* entry = FindEntry(entries, 262)) {
     info.photometric_ = static_cast<uint16_t>(tiff.Uint(*entry));
   }
@@ -426,7 +429,8 @@ auto ReadTiffContainer(std::span<const std::byte> file_bytes) -> TiffContainerIn
   if (const auto* entry = FindEntry(entries, 34675)) {
     info.icc_profile_ = CopyBytes(tiff.ValueBytes(*entry));
   }
-  info.has_dng_version_ = FindEntry(entries, 50706) != nullptr;
+  info.has_dng_version_         = FindEntry(entries, 50706) != nullptr;
+  info.has_unique_camera_model_ = FindEntry(entries, 50708) != nullptr;
   return info;
 }
 

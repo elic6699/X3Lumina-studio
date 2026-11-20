@@ -31,6 +31,7 @@
 #include "app/editor_image_render_port.hpp"
 #include "app/editor_mask_coverage_port.hpp"
 #include "app/editor_working_document.hpp"
+#include "app/handoff_proxy_registry.hpp"
 #include "app/pipeline_service.hpp"
 #include "app/project_service.hpp"
 #include "edit/frame_presentation_types.hpp"
@@ -1067,6 +1068,41 @@ TEST(EditorSessionRenderSchedulerPortTest, RebindSameImageIdentityKeepsPayloadWi
   EXPECT_EQ(context->input, input_ptr);
   EXPECT_EQ(context->image, image_ptr);
   EXPECT_EQ(scheduler.context_payload_load_count(), loads_before);
+}
+
+TEST(EditorSessionRenderSchedulerPortTest, RebindSameImageWithNewDecodeSourceDropsStalePayload) {
+  // A handoff redirects a still-open library image from its X3F to an external TIFF/DNG. The
+  // cached payload belongs to the old byte source; rebind must drop it so the next EnsureContext
+  // reloads from the proxy instead of decoding the stale X3F bytes as an unknown RAW.
+  constexpr image_id_t kImageId = 11;
+  auto&                registry = HandoffProxyRegistry::Instance();
+  registry.TakeForImage(kImageId);  // start clean in case another test left an entry
+  auto ready = MakeReadyContext(/*epoch=*/1, /*element_id=*/22, /*image_id=*/kImageId);
+  const auto stale_input = ready.input;
+  const auto stale_image = ready.image;
+  ASSERT_TRUE(ready.decode_source_.empty());
+  EditorSessionRenderSchedulerPort scheduler;
+  scheduler.InstallSessionContext(std::move(ready));
+
+  registry.Track(HandoffProxyRegistry::Proxy{
+      /*element_id=*/22, /*image_id=*/kImageId,
+      /*source_path=*/std::filesystem::path("D:/fixture/source.arw"),
+      /*cache_path=*/std::filesystem::path("D:/fixture/handoff.tif")});
+  scheduler.BindSessionContext(/*epoch=*/9, /*element_id=*/22, /*image_id=*/kImageId,
+                               /*presentation_sink_id=*/77);
+
+  const auto context = scheduler.session_context();
+  ASSERT_TRUE(context.has_value());
+  EXPECT_EQ(context->epoch, 9u);
+  EXPECT_EQ(context->element_id, 22u);
+  EXPECT_EQ(context->image_id, kImageId);
+  EXPECT_NE(context->input, stale_input);
+  EXPECT_NE(context->image, stale_image);
+  EXPECT_EQ(context->input, nullptr);
+  EXPECT_EQ(context->image, nullptr);
+  EXPECT_EQ(context->decode_source_, std::filesystem::path("D:/fixture/handoff.tif"));
+
+  registry.TakeForImage(kImageId);  // leave no global state behind
 }
 
 TEST(EditorSessionRenderSchedulerPortTest,

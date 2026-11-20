@@ -208,6 +208,28 @@ fi
 
 bad_deps=()
 missing_deps=()
+bad_rpaths=()
+
+# A developer-machine LC_RPATH such as /opt/homebrew can override bundled
+# siblings and load a second OpenMP runtime into the process.  Reject those
+# paths so packaging fails before shipping an app that aborts at launch.
+for file in "${macho_files[@]}"; do
+  [[ -f "$file" ]] || continue
+  while IFS= read -r rpath; do
+    [[ -n "$rpath" ]] || continue
+    case "$rpath" in
+      /opt/*|/usr/local/*)
+        bad_rpaths+=("${file} -> ${rpath}")
+        ;;
+    esac
+  done < <(otool -l "$file" 2>/dev/null | awk '$1 == "path" {print $2}')
+done
+
+if [[ "${#bad_rpaths[@]}" -gt 0 ]]; then
+  printf '[alcedo] developer-machine LC_RPATH entries in bundled Mach-O files:\n' >&2
+  printf '  %s\n' "${bad_rpaths[@]}" >&2
+  exit 1
+fi
 
 has_swift_rpath() {
   otool -l "$1" 2>/dev/null | grep -q 'path /usr/lib/swift (offset'

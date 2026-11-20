@@ -18,6 +18,7 @@
 #include <QStringList>
 #include <QThread>
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <exception>
@@ -31,9 +32,12 @@
 #include "automation/handoff_cache.hpp"
 #include "utils/import/import_log.hpp"
 
+#include "app/album_browse_service.hpp"
 #include "app/editor_adjustment_context.hpp"
 #include "app/editor_pending_input.hpp"
 #include "app/external_editor_bridge.hpp"
+#include "app/handoff_color_rebind.hpp"
+#include "app/handoff_proxy_registry.hpp"
 #include "app/editor_session_bootstrap.hpp"
 #include "app/image_pool_service.hpp"
 #include "app/project_package_backend.hpp"
@@ -106,6 +110,44 @@ void ReportSurvivingProjectServices(const ProjectServiceWatch& watch) {
   report("ThumbnailService", watch.thumbnails_.use_count());
   report("MaskThumbnailService", watch.mask_thumbnails_.use_count());
   report("ExportService", watch.export_.use_count());
+}
+
+auto IsInsideDirectory(const std::filesystem::path& path, const std::filesystem::path& root)
+    -> bool {
+  std::error_code ec;
+  const auto       candidate = std::filesystem::weakly_canonical(path, ec);
+  if (ec) {
+    return false;
+  }
+  const auto directory = std::filesystem::weakly_canonical(root, ec);
+  if (ec) {
+    return false;
+  }
+  auto candidate_it = candidate.begin();
+  auto directory_it = directory.begin();
+  for (; directory_it != directory.end(); ++directory_it, ++candidate_it) {
+    if (candidate_it == candidate.end() || *candidate_it != *directory_it) {
+      return false;
+    }
+  }
+  return candidate_it != candidate.end();
+}
+
+auto PathsReferToSameFile(const std::filesystem::path& left, const std::filesystem::path& right)
+    -> bool {
+  if (left.empty() || right.empty()) {
+    return false;
+  }
+  std::error_code ec;
+  const auto       a = std::filesystem::weakly_canonical(left, ec);
+  if (ec) {
+    return false;
+  }
+  const auto b = std::filesystem::weakly_canonical(right, ec);
+  if (ec) {
+    return false;
+  }
+  return a == b;
 }
 
 }  // namespace
@@ -575,6 +617,10 @@ ApplicationModuleHost::ApplicationModuleHost(QObject* parent, LifecycleObserver 
     if (!extra.isEmpty()) {
       args = QProcess::splitCommand(extra);
     }
+    // The source path must stay immediately after the configured extra args (e.g.
+    // "--external-edit"): the companion reads the argument right after that flag as the file
+    // to edit. The library ids are recovered by the companion at handoff time via search.query,
+    // so no extra flags are injected here.
     args.append(QString::fromStdWString(source.generic_wstring()));
     const bool started = QProcess::startDetached(app, args);
     qWarning().noquote() << "[X3LuminaBridge] startDetached result=" << started
@@ -783,6 +829,88 @@ void ApplicationModuleHost::OnImportLogReady(
   }
 }
 
+auto ApplicationModuleHost::OpenHandoffEditor(sl_element_id_t element_id, image_id_t image_id,
+                                              const std::filesystem::path& source_path,
+                                              const std::filesystem::path& cache_path,
+                                              QString* error) -> bool {
+  const auto fail = [error](const QString& message) {
+    if (error != nullptr) {
+      *error = message;
+    }
+    return false;
+  };
+
+  if (!project_ || !project_->ProjectEntered() || !workspace_router_) {
+    return fail(QStringLiteral("No project is open for the handoff."));
+  }
+  if (element_id == 0 || image_id == 0 || source_path.empty() || cache_path.empty()) {
+    return fail(QStringLiteral("The handoff is missing its source or cache path."));
+  }
+
+  const QString cache_dir = automation::HandoffCacheDirectory();
+  if (cache_dir.isEmpty() ||
+      !IsInsideDirectory(cache_path, std::filesystem::path(cache_dir.toStdWString()))) {
+    return fail(QStringLiteral("The handoff file is not inside the Studio cache directory."));
+  }
+  if (!QFileInfo::exists(QString::fromStdWString(cache_path.wstring()))) {
+    return fail(QStringLiteral("The handoff file no longer exists."));
+  }
+
+  auto project_service = project_->handler().project();
+  if (!project_service) {
+    return fail(QStringLiteral("The open project is not available."));
+  }
+  auto pool = project_service->GetImagePoolService();
+  if (!pool) {
+    return fail(QStringLiteral("The library image pool is not available."));
+  }
+
+  std::filesystem::path library_path;
+  try {
+    library_path = pool->Read<std::filesystem::path>(
+        image_id, [](const std::shared_ptr<alcedo::Image>& img) -> std::filesystem::path {
+          return img ? img->image_path_ : std::filesystem::path{};
+        });
+  } catch (const std::exception& e) {
+    return fail(QString::fromUtf8(e.what()));
+  }
+  if (!PathsReferToSameFile(library_path, source_path)) {
+    return fail(QStringLiteral("The handoff source does not match this library photo."));
+  }
+
+  auto browse = project_service->GetAlbumBrowseService();
+  if (!browse) {
+    return fail(QStringLiteral("The library cannot be read."));
+  }
+  bool belongs_to_element = false;
+  try {
+    const std::array<sl_element_id_t, 1> ids{element_id};
+    for (const auto& row : browse->ReadAlbumFileRows(ids)) {
+      if (row.file_id_ == element_id && row.image_id_ == image_id) {
+        belongs_to_element = true;
+        break;
+      }
+    }
+  } catch (const std::exception& e) {
+    return fail(QString::fromUtf8(e.what()));
+  }
+  if (!belongs_to_element) {
+    return fail(QStringLiteral("The handoff source is not this library element."));
+  }
+
+  // Pure byte-source redirect. No Image mutation, no database write, and no colour operation:
+  // the editor and the export service read the DNG/TIFF bytes and colour description exactly as
+  // produced by the external editor, while the library row and thumbnail stay on the X3F/X3I.
+  HandoffProxyRegistry::Instance().Track(
+      HandoffProxyRegistry::Proxy{element_id, image_id, source_path, cache_path});
+  // Do not remember the image here. The Open sequence can emit an idle-close transition for the
+  // previous (empty) session; if last_handoff_image_id_ were already set, that transition would
+  // take the proxy back and the editor would decode the original X3F again. The proxy is picked up
+  // by OnEditorIdleAfterClose once the session is actually Interactive for this image.
+  workspace_router_->OpenEditorWithProxy(static_cast<uint>(element_id), static_cast<uint>(image_id));
+  return true;
+}
+
 void ApplicationModuleHost::OnEditorIdleAfterClose() {
   if (!editor_session_) {
     return;
@@ -791,9 +919,11 @@ void ApplicationModuleHost::OnEditorIdleAfterClose() {
   const auto image = editor_session_->image_id();
 
   // Remember a handoff image while it is open so that after close, when the session has
-  // already cleared its id, we still know which asset to discard.
+  // already cleared its id, we still know which temporary source to discard. The older
+  // import-based handoff and the new decoding-proxy handoff share this single slot.
   if (state == alcedo::EditorSessionState::Interactive && image != 0 &&
-      temporary_assets_.Contains(image)) {
+      (temporary_assets_.Contains(image) ||
+       HandoffProxyRegistry::Instance().Contains(image))) {
     last_handoff_image_id_ = image;
     return;
   }
@@ -806,6 +936,17 @@ void ApplicationModuleHost::OnEditorIdleAfterClose() {
     return;
   }
 
+  // Proxy handoff: the library element is the user's original photo and must stay. Only the
+  // temporary decoding source is revoked and its cache file removed.
+  if (const auto proxy = HandoffProxyRegistry::Instance().TakeForImage(last_handoff_image_id_)) {
+    const auto released_image = last_handoff_image_id_;
+    last_handoff_image_id_ = 0;
+    ClearHandoffColorRebind(released_image);
+    QFile::remove(QString::fromStdWString(proxy->cache_path_.wstring()));
+    return;
+  }
+
+  // Legacy import-based handoff: the imported element itself is temporary.
   const auto asset = temporary_assets_.TakeForImage(last_handoff_image_id_);
   last_handoff_image_id_ = 0;
   if (!asset.has_value() || !library_mutations_) {
@@ -864,6 +1005,9 @@ void ApplicationModuleHost::ShutdownModules() {
   // files are pure temporary data, so remove them. Database records are left to project save.
   for (const auto& asset : temporary_assets_.TakeAll()) {
     QFile::remove(QString::fromStdWString(asset.cache_path_.wstring()));
+  }
+  for (const auto& proxy : HandoffProxyRegistry::Instance().TakeAll()) {
+    QFile::remove(QString::fromStdWString(proxy.cache_path_.wstring()));
   }
   last_handoff_image_id_ = 0;
 

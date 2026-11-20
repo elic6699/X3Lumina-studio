@@ -15,6 +15,8 @@
 #include <utility>
 
 #include "app/editor_image_render_port.hpp"
+#include "app/handoff_color_rebind.hpp"
+#include "app/handoff_proxy_registry.hpp"
 #include "app/pipeline_service.hpp"
 #include "edit/frame_presentation_types.hpp"
 #include "edit/pipeline/pipeline_executor.hpp"
@@ -200,12 +202,17 @@ void EditorSessionRenderSchedulerPort::BindSessionContext(
     std::uint64_t epoch, sl_element_id_t element_id, image_id_t image_id,
     alcedo::PresentationSinkId presentation_sink_id) {
   std::scoped_lock lock(mutex_);
-  // Same open image: keep Image / ImageBuffer. RouteInitialRender
+  // The decode source may be redirected by a handoff proxy while the same library image stays
+  // open (library X3F -> external TIFF/DNG). The cached Image/ImageBuffer belongs to one decode
+  // source, so a change here must drop the payload even though element/image are unchanged.
+  const auto proxy = HandoffProxyRegistry::Instance().ProxyPathFor(image_id);
+  std::filesystem::path decode_source = proxy.value_or(std::filesystem::path{});
+  // Same open image and same decode source: keep Image / ImageBuffer. RouteInitialRender
   // (undo, head-move, quality re-route) rebinds with the same element/image and
   // must not force another full-file LoadImageInputBuffer or drop the payload.
-  // Only a true image identity change replaces the whole context.
   if (session_context_ && session_context_->element_id == element_id &&
-      session_context_->image_id == image_id) {
+      session_context_->image_id == image_id &&
+      session_context_->decode_source_ == decode_source) {
     session_context_->epoch                = epoch;
     session_context_->presentation_sink_id = presentation_sink_id;
     return;
@@ -215,6 +222,7 @@ void EditorSessionRenderSchedulerPort::BindSessionContext(
   context.element_id           = element_id;
   context.image_id             = image_id;
   context.presentation_sink_id = presentation_sink_id;
+  context.decode_source_       = std::move(decode_source);
   session_context_             = std::move(context);
 }
 
@@ -426,9 +434,12 @@ auto EditorSessionRenderSchedulerPort::EnsureContext(
     std::uint64_t epoch, sl_element_id_t element_id, image_id_t image_id,
     alcedo::PresentationSinkId presentation_sink_id, std::string* error)
     -> std::optional<EditorRenderSessionContext> {
+  const auto proxy_now = HandoffProxyRegistry::Instance().ProxyPathFor(image_id);
+  const std::filesystem::path decode_source_now = proxy_now.value_or(std::filesystem::path{});
   {
     std::scoped_lock lock(mutex_);
     if (session_context_ && ContextMatches(*session_context_, epoch, element_id, image_id) &&
+        session_context_->decode_source_ == decode_source_now &&
         ContextPayloadReady(*session_context_)) {
       return session_context_;
     }
@@ -441,12 +452,14 @@ auto EditorSessionRenderSchedulerPort::EnsureContext(
     pipeline_port       = pipeline_port_;
     image_pool_resolver = services_.image_pool;
     // Align identity with this request when open/switch bind was skipped.
-    if (!session_context_ || !ContextMatches(*session_context_, epoch, element_id, image_id)) {
+    if (!session_context_ || !ContextMatches(*session_context_, epoch, element_id, image_id) ||
+        session_context_->decode_source_ != decode_source_now) {
       EditorRenderSessionContext context;
       context.epoch                = epoch;
       context.element_id           = element_id;
       context.image_id             = image_id;
       context.presentation_sink_id = presentation_sink_id;
+      context.decode_source_       = decode_source_now;
       session_context_             = std::move(context);
     }
   }
@@ -662,6 +675,12 @@ void EditorSessionRenderSchedulerPort::DispatchPipelineFrame(Job job, alcedo::IF
     });
     return;
   }
+  // Handoff proxy: the encoded bytes are the external DNG/TIFF but the editor session's working
+  // document still carries the original X3F colour description. Bind a render-only clone of the
+  // snapshot to the handoff file's own colour metadata so the preview shows the correct colour.
+  // The working document, stored history and X3F file are untouched; results are cached per
+  // (snapshot, cache path), so repeated frames do no per-frame metadata work.
+  snapshot = alcedo::RebindSnapshotColorIfHandoff(job.request.intent.image_id, snapshot);
 
   try {
     TraceDetailRequest("pipeline-submit", job.request);

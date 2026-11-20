@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -732,6 +733,89 @@ auto RegisterAutomationEditorCommands(AutomationCommandRegistry& registry,
     AfterQueuedChanges(wait, evaluate);
   };
   RegisterOrFail(registry, std::move(open), &ok, error);
+
+  AutomationCommandSpec open_handoff;
+  open_handoff.method = QStringLiteral("editor.openHandoff");
+  open_handoff.description = QStringLiteral(
+      "Opens the library photo whose id is given, but reads its pixels from a temporary DNG / "
+      "16-bit TIFF produced by the external editor. The library element and its original X3F "
+      "are unchanged; the proxy and cache file are discarded when the editor closes. Answers "
+      "when the editor can edit the photo.");
+  open_handoff.params_schema = AutomationClosedParamsSchema(
+      QJsonObject{{"element_id", id_schema},
+                  {"image_id", id_schema},
+                  {"source_path", text_schema},
+                  {"cache_path", text_schema}},
+      QJsonArray{"element_id", "image_id", "source_path", "cache_path"});
+  open_handoff.result_schema = identity_schema;
+  open_handoff.changes_state = true;
+  open_handoff.handler       = [host](const QJsonObject& params, AutomationReply reply) {
+    const auto service = AutomationEnteredProject(host, reply);
+    if (!service) {
+      return;
+    }
+    const auto element_param =
+        AutomationElementIdParam(params, QStringLiteral("element_id"), reply);
+    if (!element_param.has_value()) {
+      return;
+    }
+    const auto image_param = AutomationElementIdParam(params, QStringLiteral("image_id"), reply);
+    if (!image_param.has_value()) {
+      return;
+    }
+    const QString source_path = params.value(QStringLiteral("source_path")).toString();
+    const QString cache_path  = params.value(QStringLiteral("cache_path")).toString();
+    if (source_path.isEmpty()) {
+      SendAutomationParamError(reply, QStringLiteral("/source_path"),
+                               QStringLiteral("source_path must not be empty"));
+      return;
+    }
+    if (cache_path.isEmpty()) {
+      SendAutomationParamError(reply, QStringLiteral("/cache_path"),
+                               QStringLiteral("cache_path must not be empty"));
+      return;
+    }
+
+    QString failure;
+    if (!host->OpenHandoffEditor(*element_param, *image_param,
+                                 std::filesystem::path(source_path.toStdWString()),
+                                 std::filesystem::path(cache_path.toStdWString()), &failure)) {
+      SendAutomationOwnerError(reply, AutomationErrorCode::Failed, failure);
+      return;
+    }
+
+    const auto                   element_id = *element_param;
+    const auto                   image_id   = *image_param;
+    ui::EditorSessionController* editor     = host->editor_session();
+    QPointer<AutomationCommandWait> wait    = new AutomationCommandWait(std::move(reply), host);
+    const auto                      evaluate = [wait, editor, element_id, image_id] {
+      if (wait == nullptr) {
+        return;
+      }
+      const auto* backend = editor->session_backend();
+      if (backend == nullptr) {
+        wait->SendOwnerError(AutomationErrorCode::Failed,
+                             QStringLiteral("The editor session is not available."));
+        return;
+      }
+      const auto state    = backend->state();
+      const auto identity = backend->identity();
+      if (identity.element_id == element_id && identity.image_id == image_id &&
+          state == EditorSessionState::Interactive && editor->can_edit()) {
+        wait->SendResult(EditorIdentity(*editor));
+        return;
+      }
+      if (state == EditorSessionState::Failed ||
+          state == EditorSessionState::RetainedImageFailure) {
+        wait->SendOwnerError(AutomationErrorCode::Failed, editor->last_error());
+      }
+    };
+    QObject::connect(editor, &ui::EditorSessionController::StateChanged, wait, evaluate);
+    QObject::connect(editor, &ui::EditorSessionController::ActionAvailabilityChanged, wait,
+                     evaluate);
+    AfterQueuedChanges(wait, evaluate);
+  };
+  RegisterOrFail(registry, std::move(open_handoff), &ok, error);
 
   AutomationCommandSpec close;
   close.method      = QStringLiteral("editor.close");

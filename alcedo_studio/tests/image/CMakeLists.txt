@@ -10,6 +10,16 @@ target_compile_definitions(MetadataExtractorTest PRIVATE
 gtest_discover_tests(MetadataExtractorTest TEST_PREFIX "MetadataExtractorTest.")
 alcedo_register_test_target(MetadataExtractorTest image)
 
+# Content classification: a rendered RGB TIFF with camera EXIF must be classified as raster,
+# never RAW (external-editor handoff regression: "LibRaw open_buffer failed").
+add_executable(ImageContentClassTest ${ALCEDO_TEST_ROOT}/image/image_content_class_test.cpp)
+target_include_directories(ImageContentClassTest PUBLIC ${ALCEDO_INCLUDE_DIR})
+target_link_libraries(ImageContentClassTest PRIVATE GTest::gtest_main Image)
+target_compile_definitions(ImageContentClassTest PRIVATE
+    ALCEDO_RASTER_FIXTURE_DIR="${ALCEDO_TEST_ROOT}/resources/raster")
+gtest_discover_tests(ImageContentClassTest TEST_PREFIX "ImageContentClassTest.")
+alcedo_register_test_target(ImageContentClassTest image)
+
 add_executable(BatchImportDngMetadataTest ${ALCEDO_TEST_ROOT}/image/batch_import_dng_metadata_test.cpp)
 target_include_directories(BatchImportDngMetadataTest PUBLIC ${ALCEDO_INCLUDE_DIR})
 target_link_libraries(BatchImportDngMetadataTest PRIVATE GTest::gtest_main Image)

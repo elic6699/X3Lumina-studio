@@ -47,6 +47,9 @@ class WorkspaceRouter final : public QObject {
   Q_INVOKABLE void OpenLibrary();
   /// Shared route operation of the UI and the automation commands.
   Q_INVOKABLE void OpenEditor(uint elementId = 0, uint imageId = 0);
+  /// Opens the built-in editor without handing the X3F/X3I source to the companion app. Used
+  /// only when a handoff proxy has already redirected this element's decoding source.
+  Q_INVOKABLE void OpenEditorWithProxy(uint elementId = 0, uint imageId = 0);
   Q_INVOKABLE void openLibrary() { OpenLibrary(); }
   /// The user route to the editor. While an automation agent holds control, it opens only the
   /// image that the editor session has open already (return from the library); another image or

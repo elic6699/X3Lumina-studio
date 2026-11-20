@@ -79,6 +79,10 @@ void WorkspaceRouter::OpenEditor(uint elementId, uint imageId) {
           << QString::fromStdWString(source.wstring());
     }
   }
+  OpenEditorWithProxy(elementId, imageId);
+}
+
+void WorkspaceRouter::OpenEditorWithProxy(uint elementId, uint imageId) {
   workspace_  = QStringLiteral("editor");
   element_id_ = elementId;
   image_id_   = imageId;
