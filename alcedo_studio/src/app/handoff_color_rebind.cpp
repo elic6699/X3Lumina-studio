@@ -68,14 +68,23 @@ auto BuildReboundSnapshot(const std::filesystem::path& cache_path,
     }
   }
 
-  // A 16-bit TIFF is a raster: its pixels are already encoded, so the Develop `input` object and
-  // the DRT colour configuration must come from the handoff TIFF, not from the X3F RAW document.
-  // Replacing the whole document with CreateDefaultRasterPipelineDocument would also drop the
-  // editor's current adjustment chain, which is why the viewport stopped reacting while an
-  // out-of-band batch render still changed. Clone the working document and transplant only the
-  // colour-defining fields from the proven raster-default document; grade/adjustment nodes,
-  // history identity and all edit values stay intact. No colour math or gamut clipping happens
-  // here: the raster description is copied byte-for-byte into the render-only clone.
+  // A 16-bit TIFF is a raster: its pixels are already encoded, so the Develop `input` object must
+  // come from the handoff TIFF, not from the X3F RAW document. Replacing the whole document with
+  // CreateDefaultRasterPipelineDocument would also drop the editor's current adjustment chain,
+  // which is why the viewport stopped reacting while an out-of-band batch render still changed.
+  // Clone the working document and transplant only the Develop input; every grade/adjustment and
+  // the entire DRT are left untouched. No colour math or gamut clipping happens here: the raster
+  // description is copied byte-for-byte into the render-only clone.
+  //
+  // The DRT is deliberately NEVER replaced here. Its output encoding (encoding_space / eotf /
+  // limiting_space / peak_luminance) is the user's *display intent*, independent of whether the
+  // input bytes came from an X3F, a DNG or an exported TIFF -- exactly why the DNG branch above
+  // binds only the camera profile and leaves the DRT alone. Overwriting those fields from the
+  // TIFF's raster description forced encoding_space to rec2020 and made every interactive frame
+  // fail DrtOutputResolver::CheckFilmPrintEncoding ("film print encodes only Rec. 709"), freezing
+  // the viewport so *all* edits (exposure, film stock, ...) appeared to do nothing. Keeping the
+  // working document's DRT also preserves the user's Film Print negative/material/scene light and
+  // every other DRT edit verbatim.
   if (const auto kind = MetadataExtractor::ClassifyRasterFile(cache_path); kind.has_value()) {
     Image raster_probe;
     MetadataExtractor::ExtractRasterMetadata_ToImage(cache_path, *kind, raster_probe);
@@ -88,9 +97,6 @@ auto BuildReboundSnapshot(const std::filesystem::path& cache_path,
         payload.input             = raster_defaults.Develop()->Params().Params().input;
         payload.lens_enabled      = false;
         develop->Params().ReplaceParams(std::move(payload));
-      }
-      if (auto* drt = document->Drt(); drt != nullptr && raster_defaults.Drt()) {
-        drt->Params().ReplaceParams(raster_defaults.Drt()->Params().Params());
       }
       return PipelineGraphSnapshot::Preview(document->Freeze(), source->ElementId(),
                                             source->Lineage(), source->Chain());
